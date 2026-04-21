@@ -53,6 +53,12 @@ export class CM0102Parser {
     return val;
   }
 
+  private readInt8(): number {
+    const val = this.view.getInt8(this.offset);
+    this.offset += 1;
+    return val;
+  }
+
   private readUint8(): number {
     const val = this.view.getUint8(this.offset);
     this.offset += 1;
@@ -217,19 +223,24 @@ export class CM0102Parser {
       const wage = this.readInt32(); // 78-81
       const value = this.readInt32(); // 82-85
       
+      const readStaffAttr = () => {
+        const val = this.readInt8();
+        return val < 0 ? val + 256 : val;
+      };
+      
       // Mental attributes (86-96)
       const mentalAttributes: Record<string, number> = {
-        "Adaptability": this.readUint8(),
-        "Ambition": this.readUint8(),
-        "Determination": this.readUint8(),
-        "Loyalty": this.readUint8(),
-        "Pressure": this.readUint8(),
-        "Professionalism": this.readUint8(),
-        "Sportsmanship": this.readUint8(),
-        "Temperament": this.readUint8(),
-        "Playing Squad": this.readUint8(),
-        "Classification": this.readUint8(),
-        "Club Valuation": this.readUint8()
+        "Adaptability": readStaffAttr(),
+        "Ambition": readStaffAttr(),
+        "Determination": readStaffAttr(),
+        "Loyalty": readStaffAttr(),
+        "Pressure": readStaffAttr(),
+        "Professionalism": readStaffAttr(),
+        "Sportsmanship": readStaffAttr(),
+        "Temperament": readStaffAttr(),
+        "Playing Squad": readStaffAttr(),
+        "Classification": readStaffAttr(),
+        "Club Valuation": readStaffAttr()
       };
       
       const playerId = this.readInt32(); // 97-100
@@ -260,89 +271,81 @@ export class CM0102Parser {
     const count = block.size / 70;
     this.log(`player: ${count} records`, 'info');
 
-    const technicalAttrs = [
-      "Acceleration", "Aggression", "Agility", "Anticipation", "Balance", "Bravery", "Consistency", 
-      "Corners", "Crossing", "Decisions", "Dirtiness", "Dribbling", "Finishing", 
-      "Flair", "SetPieces", "Handling", "Heading", "ImportantMatches", "InjuryProneness", "Jumping", "Influence", "LeftFoot", 
-      "LongShots", "Marking", "OffTheBall", "NaturalFitness", "OneOnOnes", "Pace", "Passing", "Penalties", 
-      "Positioning", "Reflexes", "RightFoot", "Stamina", "Strength", "Tackling", "Teamwork", 
-      "Technique", "ThrowIns", "Versatility", "Creativity", "WorkRate"
-    ];
-
-    const posNames = [
-      "GK", "SW", "D", "DM", "M", "AM", "F", "S",
-      "Left", "Right", "Centre"
-    ];
-
     for (let i = 0; i < count; i++) {
-      this.offset = block.position + i * 70;
-      const id = this.readInt32(); // 0-3
-      const squadNumber = this.readUint8(); // 4
-      const currentAbility = this.readInt16(); // 5-6
-      const potentialAbility = this.readInt16(); // 7-8
-      const homeRep = this.readInt16(); // 9-10
-      const currentRep = this.readInt16(); // 11-12
-      const worldRep = this.readInt16(); // 13-14
+      const recordStart = block.position + i * 70;
       
+      const id = this.view.getInt32(recordStart + 0, true);
+      const squadNumber = this.view.getUint8(recordStart + 4);
+      const currentAbility = this.view.getInt16(recordStart + 5, true);
+      const potentialAbility = this.view.getInt16(recordStart + 7, true);
+      const homeRep = this.view.getInt16(recordStart + 9, true);
+      const currentRep = this.view.getInt16(recordStart + 11, true);
+      const worldRep = this.view.getInt16(recordStart + 13, true);
+
+      const readAt = (offset: number) => {
+        const val = this.view.getInt8(recordStart + offset);
+        return val < 0 ? val + 256 : val;
+      };
+
       const positions: Record<string, number> = {
-        "Goalkeeper": this.readUint8(),
-        "Sweeper": this.readUint8(),
-        "Defender": this.readUint8(),
-        "DefensiveMidfielder": this.readUint8(),
-        "Midfielder": this.readUint8(),
-        "AttackingMidfielder": this.readUint8(),
-        "Attacker": this.readUint8(),
-        "WingBack": this.readUint8(),
-        "RightSide": this.readUint8(),
-        "LeftSide": this.readUint8(),
-        "CentreSide": this.readUint8(),
-        "FreeRole": this.readUint8()
+        "Goalkeeper": readAt(15),
+        "Sweeper": readAt(16),
+        "Defender": readAt(17),
+        "DefensiveMidfielder": readAt(18),
+        "Midfielder": readAt(19),
+        "AttackingMidfielder": readAt(20),
+        "Attacker": readAt(21),
+        "WingBack": readAt(22),
+        "RightSide": readAt(23),
+        "LeftSide": readAt(24),
+        "CentreSide": readAt(25),
+        "FreeRole": readAt(26)
       };
 
       const playerAttrs: Record<string, number> = {
-        "Acceleration": this.readUint8(),
-        "Aggression": this.readUint8(),
-        "Agility": this.readUint8(),
-        "Anticipation": this.readUint8(),
-        "Balance": this.readUint8(),
-        "Bravery": this.readUint8(),
-        "Consistency": this.readUint8(),
-        "Corners": this.readUint8(),
-        "Crossing": this.readUint8(),
-        "Decisions": this.readUint8(),
-        "Dirtiness": this.readUint8(),
-        "Dribbling": this.readUint8(),
-        "Finishing": this.readUint8(),
-        "Flair": this.readUint8(),
-        "SetPieces": this.readUint8(),
-        "Handling": this.readUint8(),
-        "Heading": this.readUint8(),
-        "ImportantMatches": this.readUint8(),
-        "InjuryProneness": this.readUint8(),
-        "Jumping": this.readUint8(),
-        "Influence": this.readUint8(),
-        "LeftFoot": this.readUint8(),
-        "LongShots": this.readUint8(),
-        "Marking": this.readUint8(),
-        "OffTheBall": this.readUint8(),
-        "NaturalFitness": this.readUint8(),
-        "OneOnOnes": this.readUint8(),
-        "Pace": this.readUint8(),
-        "Passing": this.readUint8(),
-        "Penalties": this.readUint8(),
-        "Positioning": this.readUint8(),
-        "Reflexes": this.readUint8(),
-        "RightFoot": this.readUint8(),
-        "Stamina": this.readUint8(),
-        "Strength": this.readUint8(),
-        "Tackling": this.readUint8(),
-        "Teamwork": this.readUint8(),
-        "Technique": this.readUint8(),
-        "ThrowIns": this.readUint8(),
-        "Versatility": this.readUint8(),
-        "Creativity": this.readUint8(),
-        "WorkRate": this.readUint8(),
-        "Morale": this.readUint8()
+        "Acceleration": readAt(27),
+        "Aggression": readAt(28),
+        "Agility": readAt(29),
+        "Anticipation": readAt(30),
+        "Balance": readAt(31),
+        "Bravery": readAt(32),
+        "Consistency": readAt(33),
+        "Corners": readAt(34),
+        "Crossing": readAt(35),
+        "Decisions": readAt(36),
+        "Dirtiness": readAt(37),
+        "Dribbling": readAt(38),
+        "Finishing": readAt(39),
+        "Flair": readAt(40),
+        "SetPieces": readAt(41),
+        "Handling": readAt(42),
+        "Heading": readAt(43),
+        "ImportantMatches": readAt(44),
+        "InjuryProneness": readAt(45),
+        "Jumping": readAt(46),
+        "Influence": readAt(47),
+        "LeftFoot": readAt(48),
+        "LongShots": readAt(49),
+        "Marking": readAt(50),
+        "OffTheBall": readAt(51),
+        "NaturalFitness": readAt(52),
+        "OneOnOnes": readAt(53),
+        "Pace": readAt(54),
+        "Passing": readAt(55),
+        "Penalties": readAt(56),
+        "Positioning": readAt(57),
+        "Reflexes": readAt(58),
+        "RightFoot": readAt(59),
+        "Stamina": readAt(60),
+        "Strength": readAt(61),
+        "Tackling": readAt(62),
+        "Teamwork": readAt(63),
+        "Technique": readAt(64),
+        "ThrowIns": readAt(65),
+        "Versatility": readAt(66),
+        "Creativity": readAt(67),
+        "WorkRate": readAt(68),
+        "Morale": readAt(69)
       };
 
       const staffData = staffMap.get(id);

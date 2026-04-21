@@ -1,0 +1,356 @@
+
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Search, 
+  ChevronLeft, 
+  ChevronRight, 
+  X, 
+  TrendingUp,
+} from 'lucide-react';
+import { Player } from '../lib/CM0102Parser';
+import { getFlagUrl, formatCurrency } from '../lib/constants';
+
+interface ScoutLabProps {
+  players: Player[];
+  searchTerm: string;
+  setSearchTerm: (s: string) => void;
+  filteredPlayers: Player[];
+  currentItems: Player[];
+  currentPage: number;
+  setCurrentPage: (p: number | ((prev: number) => number)) => void;
+  totalPages: number;
+  itemsPerPage: number;
+  sortBy: string | null;
+  sortDir: 'asc' | 'desc' | null;
+  handleSort: (field: string) => void;
+  columnOrder: string[];
+  setColumnOrder: (o: string[] | ((prev: string[]) => string[])) => void;
+  columnWidths: Record<string, number>;
+  setColumnWidths: (w: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => void;
+  isFilterCollapsed: boolean;
+  setIsFilterCollapsed: (b: boolean) => void;
+  contextMenu: { x: number, y: number, colKey: string } | null;
+  setContextMenu: (m: { x: number, y: number, colKey: string } | null) => void;
+  filters: any;
+  ALL_ATTRIBUTES: string[];
+}
+
+export default function ScoutLab({
+  searchTerm,
+  setSearchTerm,
+  filteredPlayers,
+  currentItems,
+  currentPage,
+  setCurrentPage,
+  totalPages,
+  itemsPerPage,
+  sortBy,
+  sortDir,
+  handleSort,
+  columnOrder,
+  setColumnOrder,
+  columnWidths,
+  setColumnWidths,
+  isFilterCollapsed,
+  setIsFilterCollapsed,
+  contextMenu,
+  setContextMenu,
+  filters,
+  ALL_ATTRIBUTES
+}: ScoutLabProps) {
+  const navigate = useNavigate();
+
+  const isPosActive = (pos: string) => filters.categories.some((cat: string) => {
+    let types: string[] = [];
+    if (cat === 'GK') types = ['Goalkeeper'];
+    if (cat === 'DEF') types = ['Defender', 'Sweeper'];
+    if (cat === 'MID') types = ['DefensiveMidfielder', 'Midfielder', 'AttackingMidfielder'];
+    if (cat === 'ATT') types = ['Attacker'];
+    return types.includes(pos);
+  });
+
+  return (
+    <main className="flex-1 flex flex-col bg-[#0E0E0E] overflow-hidden relative">
+      <header className="px-8 pt-6 pb-4 flex flex-col gap-4 border-b border-[#1C1B1B]">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-6">
+            {isFilterCollapsed && (
+              <button 
+                onClick={() => setIsFilterCollapsed(false)}
+                className="flex items-center justify-center text-white hover:text-[#E8F000]"
+              >
+                <ChevronRight size={14} />
+              </button>
+            )}
+            <div className="flex items-baseline gap-4">
+              <h2 className="font-bebas text-[29px] text-white tracking-widest leading-none translate-y-[2px]">GLOBAL DATABASE</h2>
+              <div className="font-sans text-[9px] tracking-[0.2em] font-bold text-[#888888] uppercase whitespace-nowrap">
+                {filteredPlayers.length.toLocaleString()} PLAYERS LOADED
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#888888]" />
+              <input 
+                type="text"
+                placeholder="SCAN SYSTEM..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                className="bg-[#1C1B1B] border-none rounded-lg pl-10 pr-4 py-2 text-[10px] font-mono text-white focus:ring-1 focus:ring-[#E8F000] w-64 outline-none transition-all shadow-inner"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {searchTerm && (
+            <div className="bg-[#E8F000] text-black px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg">
+              Query: {searchTerm} <X size={12} className="cursor-pointer" onClick={() => setSearchTerm('')} />
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Database Table */}
+      <div className="flex-1 overflow-hidden px-4 pb-4 mt-2 flex flex-col">
+        <div className="flex-1 bg-[#1C1B1B] rounded-2xl overflow-hidden flex flex-col shadow-2xl">
+          <div className="flex-1 overflow-auto scrollbar-hide">
+            <table className="w-full text-left border-collapse table-fixed">
+              <thead className="sticky top-0 z-10 w-full bg-[#1C1B1B]">
+                <tr className="bg-[#1C1B1B]/90 backdrop-blur-md text-white text-[13px] uppercase tracking-[0.1em] font-black w-full flex">
+                  {columnOrder.map((colKey) => {
+                    const columns: any = {
+                      name: { label: 'PLAYER NAME', sortKey: 'name' },
+                      flag: { label: '', sortKey: 'nationalityName' },
+                      pos: { label: 'POS', textAlign: 'center', sortKey: 'pos' },
+                      age: { label: 'AGE', textAlign: 'center', sortKey: 'age' },
+                      clubName: { label: 'CLUB', sortKey: 'clubName' },
+                      value: { label: 'VALUE', textAlign: 'right', sortKey: 'value' },
+                      wage: { label: 'WAGES', textAlign: 'right', sortKey: 'wage' },
+                      currentAbility: { label: 'CA', textAlign: 'center', sortKey: 'currentAbility' },
+                      potentialAbility: { label: 'PA', textAlign: 'center', sortKey: 'potentialAbility' },
+                      injuryProne: { label: 'INJ', textAlign: 'center', sortKey: 'injuryProne' },
+                      impMatches: { label: 'IMP', textAlign: 'center', sortKey: 'impMatches' },
+                      consistency: { label: 'CNS', textAlign: 'center', sortKey: 'consistency' },
+                    };
+                    ALL_ATTRIBUTES.forEach(attr => {
+                      if (!columns[attr]) {
+                        columns[attr] = { label: attr.substring(0, 3).toUpperCase(), textAlign: 'center', sortKey: `attributes.${attr}` };
+                      }
+                    });
+                    
+                    const col = columns[colKey] || { label: colKey.substring(0, 3).toUpperCase(), textAlign: 'center', sortKey: colKey };
+                    if (!col) return null;
+
+                    const onContextMenu = (e: React.MouseEvent) => {
+                      e.preventDefault();
+                      setContextMenu({ x: e.pageX, y: e.pageY, colKey });
+                    };
+
+                    const handleDragStart = (e: React.DragEvent) => {
+                      e.dataTransfer.setData('colKey', colKey);
+                    };
+
+                    const handleDrop = (e: React.DragEvent) => {
+                      const sourceKey = e.dataTransfer.getData('colKey');
+                      if (sourceKey === colKey) return;
+                      const newOrder = [...columnOrder];
+                      const sourceIdx = newOrder.indexOf(sourceKey);
+                      const targetIdx = newOrder.indexOf(colKey);
+                      newOrder.splice(sourceIdx, 1);
+                      newOrder.splice(targetIdx, 0, sourceKey);
+                      setColumnOrder(newOrder);
+                    };
+
+                    const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+
+                    const handleResizeMouseDown = (e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      const startX = e.pageX;
+                      const startWidth = columnWidths[colKey];
+
+                      const onMouseMove = (moveEvent: MouseEvent) => {
+                        const delta = moveEvent.pageX - startX;
+                        setColumnWidths(prev => ({
+                          ...prev,
+                          [colKey]: Math.max(40, startWidth + delta)
+                        }));
+                      };
+
+                      const onMouseUp = () => {
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                      };
+
+                      document.addEventListener('mousemove', onMouseMove);
+                      document.addEventListener('mouseup', onMouseUp);
+                    };
+
+                    return (
+                      <th 
+                        key={colKey}
+                        draggable
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                        onContextMenu={onContextMenu}
+                        onClick={() => col.sortKey && handleSort(col.sortKey)}
+                        className={`p-3 relative flex items-center group/header overflow-visible cursor-pointer hover:bg-white/5 transition-colors active:cursor-grabbing ${col.textAlign === 'center' ? 'justify-center text-center' : col.textAlign === 'right' ? 'justify-end text-right' : 'pl-6'}`}
+                        style={{ width: `${columnWidths[colKey]}px`, flexShrink: 0 }}
+                      >
+                        <div className={`flex items-center gap-1 ${col.textAlign === 'center' ? 'justify-center' : col.textAlign === 'right' ? 'justify-end' : ''} truncate`}>
+                          {col.label}
+                          {sortBy === col.sortKey && (
+                            <TrendingUp size={10} className={`text-[#E8F000] ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
+                          )}
+                        </div>
+                        <div 
+                          onMouseDown={handleResizeMouseDown}
+                          className="absolute right-0 top-1/4 h-1/2 w-[2px] bg-[#2A2A2A] hover:bg-[#E8F000] cursor-col-resize transition-colors z-20 active:bg-[#E8F000]"
+                        />
+                      </th>
+                    );
+                  })}
+                  <th 
+                    className="flex-1 min-w-[40px] p-3 flex items-center justify-center hover:bg-white/5 transition-colors cursor-pointer group"
+                    onClick={(e) => {
+                      setContextMenu({ x: e.pageX, y: e.pageY, colKey: columnOrder[columnOrder.length - 1] });
+                    }}
+                  >
+                    <button className="text-white font-bebas text-2xl leading-none opacity-40 group-hover:opacity-100 group-hover:text-[#E8F000] transition-all">
+                      +
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="text-[14px] font-sans">
+                {currentItems.map((player) => {
+                  const consistency = player.attributes['Consistency'] || 0;
+                  const impMatches = player.attributes['ImportantMatches'] || 0;
+                  const injuryProne = player.attributes['InjuryProneness'] || 0;
+
+                  return (
+                    <tr 
+                      key={player.id} 
+                      onClick={() => navigate(`/player/${player.id}`)}
+                      className="hover:bg-[#2A2A2A] text-[#E0E0E0] transition-colors cursor-pointer group flex w-full"
+                    >
+                      {columnOrder.map(colKey => {
+                        const width = `${columnWidths[colKey]}px`;
+                        switch (colKey) {
+                          case 'name':
+                            return (
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] pl-6 overflow-hidden flex items-center">
+                                <div className="font-sans text-[14px] text-white uppercase tracking-tighter group-hover:text-[#E8F000] transition-colors truncate font-medium flex items-center overflow-hidden whitespace-nowrap">{player.firstName} {player.lastName}</div>
+                              </td>
+                            );
+                          case 'flag':
+                            return (
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center flex items-center justify-center">
+                                <img 
+                                  src={getFlagUrl(player.nationalityName)} 
+                                  alt={player.nationalityName} 
+                                  className="w-[16px] h-[12px] opacity-90 shadow-sm"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </td>
+                            );
+                          case 'pos':
+                            const getPrimaryPos = () => {
+                              const vals = [
+                                { label: 'GK', val: (player.positions as any)['Goalkeeper'] || 0 },
+                                { label: 'D', val: (player.positions as any)['Defender'] || 0 },
+                                { label: 'M', val: (player.positions as any)['Midfielder'] || 0 },
+                                { label: 'AT', val: (player.positions as any)['Attacker'] || 0 }
+                              ];
+                              return vals.reduce((prev, curr) => (curr.val > prev.val ? curr : prev), vals[0]).label;
+                            };
+                            const displayPos = getPrimaryPos();
+                            return (
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] flex items-center justify-center">
+                                <div className={`px-1 py-0.5 rounded-[3px] text-[10px] font-black border border-white/5 whitespace-nowrap ${isPosActive(displayPos) ? 'bg-[#E8F000] text-black' : 'bg-[#2A2A2A] text-white'}`}>
+                                  {displayPos}
+                                </div>
+                              </td>
+                            );
+                          case 'age':
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono flex items-center justify-center opacity-80">{player.age}</td>;
+                          case 'clubName':
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-[14px] text-white uppercase tracking-tighter truncate font-medium flex items-center overflow-hidden whitespace-nowrap">{player.clubName}</td>;
+                          case 'value':
+                            return (
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-mono font-bold text-white tracking-tighter flex items-center justify-end">
+                                {formatCurrency(player.value)}
+                              </td>
+                            );
+                          case 'wage':
+                            return (
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-mono font-bold text-white tracking-tighter opacity-70 flex items-center justify-end">
+                                {formatCurrency(player.wage).replace('.00', '').replace('M', 'K')}/W
+                              </td>
+                            );
+                          case 'currentAbility':
+                            return (
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-black text-[#E8F000] flex items-center justify-center">
+                                {player.currentAbility}
+                              </td>
+                            );
+                          case 'potentialAbility':
+                            return (
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-black text-[#E8F000] flex items-center justify-center">
+                                {player.potentialAbility}
+                              </td>
+                            );
+                          case 'injuryProne':
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-bold text-white flex items-center justify-center">{injuryProne}</td>;
+                          case 'impMatches':
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-bold text-white flex items-center justify-center">{impMatches}</td>;
+                          case 'consistency':
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-bold text-white flex items-center justify-center">{consistency}</td>;
+                          default:
+                            if (colKey.startsWith('attributes.')) {
+                              const attr = colKey.split('.')[1];
+                              const val = player.attributes[attr] || 0;
+                              return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-bold text-white flex items-center justify-center opacity-70">{val}</td>;
+                            }
+                            return null;
+                        }
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          
+          <div className="p-4 bg-[#1C1B1B] border-t border-[#2A2A2A]/50 flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1 text-white hover:text-[#E8F000] disabled:opacity-30 transition-colors"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-1 text-white hover:text-[#E8F000] disabled:opacity-30 transition-colors"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+              <div className="text-[10px] font-sans font-bold text-[#888888] uppercase tracking-widest">
+                SHOWING {(currentPage - 1) * itemsPerPage + 1} — {Math.min(currentPage * itemsPerPage, filteredPlayers.length)} OF {filteredPlayers.length}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
