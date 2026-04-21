@@ -284,7 +284,21 @@ export class CM0102Parser {
 
       const readAt = (offset: number) => {
         const val = this.view.getInt8(recordStart + offset);
-        return val < 0 ? val + 256 : val;
+        // CM 01/02 storing logic:
+        // 1-20: Standard attribute
+        // Negative / > 100: Random tag or uncapped value
+        // The user specifically wants everything between 1 and 20 for the scout lab.
+        if (val <= 0) {
+          // If it's a negative tag (e.g., -5 which appears as 251 unsigned), 
+          // we map it to its absolute value if it's within 1-20 range.
+          const absVal = Math.abs(val);
+          if (absVal > 0 && absVal <= 20) return absVal;
+          if (val === 0) return 1;
+          // Fallback for larger tags: map to a high range as stars usually have high tags
+          return 15;
+        }
+        // If it's an uncapped value (> 20), clamp to 20 for display as requested.
+        return Math.min(val, 20);
       };
 
       const positions: Record<string, number> = {
