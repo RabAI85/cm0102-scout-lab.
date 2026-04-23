@@ -15,7 +15,7 @@ interface ScoutLabProps {
   players: Player[];
   searchTerm: string;
   setSearchTerm: (s: string) => void;
-  filteredPlayers: Player[];
+  sortedPlayers: Player[];
   currentItems: Player[];
   currentPage: number;
   setCurrentPage: (p: number | ((prev: number) => number)) => void;
@@ -39,7 +39,7 @@ interface ScoutLabProps {
 export default function ScoutLab({
   searchTerm,
   setSearchTerm,
-  filteredPlayers,
+  sortedPlayers,
   currentItems,
   currentPage,
   setCurrentPage,
@@ -54,7 +54,6 @@ export default function ScoutLab({
   setColumnWidths,
   isFilterCollapsed,
   setIsFilterCollapsed,
-  contextMenu,
   setContextMenu,
   filters,
   ALL_ATTRIBUTES
@@ -72,43 +71,40 @@ export default function ScoutLab({
 
   return (
     <main className="flex-1 flex flex-col bg-[#0E0E0E] overflow-hidden relative">
-      <header className="px-8 pt-6 pb-4 flex flex-col gap-4 border-b border-[#1C1B1B]">
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-6">
-            {isFilterCollapsed && (
-              <button 
-                onClick={() => setIsFilterCollapsed(false)}
-                className="flex items-center justify-center text-white hover:text-[#E8F000]"
-              >
-                <ChevronRight size={14} />
-              </button>
-            )}
-            <div className="flex items-baseline gap-4">
-              <h2 className="font-bebas text-[29px] text-white tracking-widest leading-none translate-y-[2px]">GLOBAL DATABASE</h2>
-              <div className="font-sans text-[9px] tracking-[0.2em] font-bold text-[#888888] uppercase whitespace-nowrap">
-                {filteredPlayers.length.toLocaleString()} PLAYERS LOADED
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#888888]" />
-              <input 
-                type="text"
-                placeholder="SCAN SYSTEM..."
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                className="bg-[#1C1B1B] border-none rounded-lg pl-10 pr-4 py-2 text-[10px] font-mono text-white focus:ring-1 focus:ring-[#E8F000] w-64 outline-none transition-all shadow-inner"
-              />
+      {/* Search Header - Compact */}
+      <header className="h-[48px] px-6 flex items-center justify-between border-b border-[#1C1B1B] shrink-0 bg-[#0E0E0E] z-20">
+        <div className="flex items-center gap-4">
+          {isFilterCollapsed && (
+            <button 
+              onClick={() => setIsFilterCollapsed(false)}
+              className="text-[#888888] hover:text-white transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
+          )}
+          <div className="flex items-baseline gap-3">
+            <h2 className="font-bebas text-[14px] text-scout-yellow tracking-widest leading-none translate-y-[1px]">GLOBAL DATABASE</h2>
+            <div className="font-sans text-[8px] tracking-[0.2em] font-bold text-white/40 uppercase whitespace-nowrap">
+              {sortedPlayers.length.toLocaleString()} PLAYERS LOADED
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]" />
+            <input 
+              type="text"
+              placeholder="SEARCH DATABASE"
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="bg-[#1C1B1B] border-none rounded-md pl-9 pr-3 py-1.5 text-[10px] font-mono text-white focus:ring-1 focus:ring-scout-yellow w-56 outline-none transition-all"
+            />
+          </div>
           {searchTerm && (
-            <div className="bg-[#E8F000] text-black px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg">
-              Query: {searchTerm} <X size={12} className="cursor-pointer" onClick={() => setSearchTerm('')} />
-            </div>
+            <button onClick={() => setSearchTerm('')} className="text-[#888888] hover:text-white transition-colors">
+              <X size={14} />
+            </button>
           )}
         </div>
       </header>
@@ -204,12 +200,12 @@ export default function ScoutLab({
                         <div className={`flex items-center gap-1 ${col.textAlign === 'center' ? 'justify-center' : col.textAlign === 'right' ? 'justify-end' : ''} truncate`}>
                           {col.label}
                           {sortBy === col.sortKey && (
-                            <TrendingUp size={10} className={`text-[#E8F000] ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
+                            <TrendingUp size={10} className={`text-scout-yellow ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
                           )}
                         </div>
                         <div 
                           onMouseDown={handleResizeMouseDown}
-                          className="absolute right-0 top-1/4 h-1/2 w-[2px] bg-[#2A2A2A] hover:bg-[#E8F000] cursor-col-resize transition-colors z-20 active:bg-[#E8F000]"
+                          className="absolute right-0 top-1/4 h-1/2 w-[2px] bg-[#2A2A2A] hover:bg-scout-yellow cursor-col-resize transition-colors z-20 active:bg-scout-yellow"
                         />
                       </th>
                     );
@@ -244,7 +240,7 @@ export default function ScoutLab({
                           case 'name':
                             return (
                               <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] pl-6 overflow-hidden flex items-center">
-                                <div className="font-sans text-[14px] text-white uppercase tracking-tighter group-hover:text-[#E8F000] transition-colors truncate font-medium flex items-center overflow-hidden whitespace-nowrap">{player.firstName} {player.lastName}</div>
+                                <div className="font-sans text-[14px] text-white uppercase tracking-tighter group-hover:text-scout-yellow transition-colors truncate font-medium flex items-center overflow-hidden whitespace-nowrap">{player.firstName} {player.lastName}</div>
                               </td>
                             );
                           case 'flag':
@@ -271,50 +267,50 @@ export default function ScoutLab({
                             const displayPos = getPrimaryPos();
                             return (
                               <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] flex items-center justify-center">
-                                <div className={`px-1 py-0.5 rounded-[3px] text-[10px] font-black border border-white/5 whitespace-nowrap ${isPosActive(displayPos) ? 'bg-[#E8F000] text-black' : 'bg-[#2A2A2A] text-white'}`}>
+                                <div className={`px-1 py-0.5 rounded-[3px] text-[10px] font-black border border-white/5 whitespace-nowrap ${isPosActive(displayPos) ? 'bg-scout-yellow text-black' : 'bg-[#2A2A2A] text-white'}`}>
                                   {displayPos}
                                 </div>
                               </td>
                             );
                           case 'age':
-                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono flex items-center justify-center opacity-80">{player.age}</td>;
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans text-white/90 flex items-center justify-center">{player.age}</td>;
                           case 'clubName':
                             return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-[14px] text-white uppercase tracking-tighter truncate font-medium flex items-center overflow-hidden whitespace-nowrap">{player.clubName}</td>;
                           case 'value':
                             return (
-                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-mono font-bold text-white tracking-tighter flex items-center justify-end">
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-sans font-bold text-white tracking-tighter flex items-center justify-end">
                                 {formatCurrency(player.value)}
                               </td>
                             );
                           case 'wage':
                             return (
-                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-mono font-bold text-white tracking-tighter opacity-70 flex items-center justify-end">
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-sans font-bold text-scout-yellow tracking-tighter flex items-center justify-end">
                                 {formatCurrency(player.wage).replace('.00', '').replace('M', 'K')}/W
                               </td>
                             );
                           case 'currentAbility':
                             return (
-                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-black text-[#E8F000] flex items-center justify-center">
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-black text-scout-yellow flex items-center justify-center">
                                 {player.currentAbility}
                               </td>
                             );
                           case 'potentialAbility':
                             return (
-                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-black text-[#E8F000] flex items-center justify-center">
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-black text-scout-yellow flex items-center justify-center">
                                 {player.potentialAbility}
                               </td>
                             );
                           case 'injuryProne':
-                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-bold text-white flex items-center justify-center">{injuryProne}</td>;
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-bold text-white/70 flex items-center justify-center">{injuryProne}</td>;
                           case 'impMatches':
-                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-bold text-white flex items-center justify-center">{impMatches}</td>;
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-bold text-white/70 flex items-center justify-center">{impMatches}</td>;
                           case 'consistency':
-                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-bold text-white flex items-center justify-center">{consistency}</td>;
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-bold text-white/70 flex items-center justify-center">{consistency}</td>;
                           default:
                             if (colKey.startsWith('attributes.')) {
                               const attr = colKey.split('.')[1];
                               const val = player.attributes[attr] || 0;
-                              return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-mono font-bold text-white flex items-center justify-center opacity-70">{val}</td>;
+                              return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-bold text-white flex items-center justify-center opacity-70">{val}</td>;
                             }
                             return null;
                         }
@@ -344,8 +340,8 @@ export default function ScoutLab({
                   <ChevronRight size={18} />
                 </button>
               </div>
-              <div className="text-[10px] font-sans font-bold text-[#888888] uppercase tracking-widest">
-                SHOWING {(currentPage - 1) * itemsPerPage + 1} — {Math.min(currentPage * itemsPerPage, filteredPlayers.length)} OF {filteredPlayers.length}
+              <div className="text-[10px] font-sans font-bold text-[#888888] uppercase tracking-widest flex items-center h-4">
+                SHOWING <span className="text-white mx-2">{(sortedPlayers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0)} — {Math.min(currentPage * itemsPerPage, sortedPlayers.length)}</span> OF {sortedPlayers.length}
               </div>
             </div>
           </div>

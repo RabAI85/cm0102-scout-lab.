@@ -25,6 +25,9 @@ export interface Player {
   };
   attributes: Record<string, number>;
   positions: Record<string, number>;
+  history?: any[];
+  transferStatus?: boolean;
+  loanStatus?: boolean;
 }
 
 export class CM0102Parser {
@@ -184,6 +187,28 @@ export class CM0102Parser {
     return map;
   }
 
+  private normalizeAttr(val: number): number {
+    // CM 01/02 storage of attributes:
+    // Interpret as unsigned 0-255 to handle tags and mapping consistently.
+    const uVal = val < 0 ? val + 256 : val;
+    
+    // Negative values in signed Int8 (-1 to -20) represent random tags.
+    // In unsigned byte terms: 255 is -1, 236 is -20.
+    if (uVal >= 236 && uVal <= 255) {
+      return 256 - uVal; // maps 255 -> 1, 236 -> 20.
+    }
+    
+    // Value 0 is usually unset/random in CM, map to 1 for display.
+    if (uVal === 0) return 1;
+
+    // Most attributes are 1-20.
+    if (uVal <= 20) return uVal;
+    
+    // For values > 20, they might be uncapped attributes or on a 1-100/1-200 scale.
+    // We clamp to 20 to respect the user's 1-20 requirement for consistent scouting.
+    return 20;
+  }
+
   private parseStaff(
     block: any,
     firstNames: Map<number, string>,
@@ -223,10 +248,7 @@ export class CM0102Parser {
       const wage = this.readInt32(); // 78-81
       const value = this.readInt32(); // 82-85
       
-      const readStaffAttr = () => {
-        const val = this.readInt8();
-        return val < 0 ? val + 256 : val;
-      };
+      const readStaffAttr = () => this.normalizeAttr(this.readInt8());
       
       // Mental attributes (86-96)
       const mentalAttributes: Record<string, number> = {
@@ -284,21 +306,7 @@ export class CM0102Parser {
 
       const readAt = (offset: number) => {
         const val = this.view.getInt8(recordStart + offset);
-        // CM 01/02 storing logic:
-        // 1-20: Standard attribute
-        // Negative / > 100: Random tag or uncapped value
-        // The user specifically wants everything between 1 and 20 for the scout lab.
-        if (val <= 0) {
-          // If it's a negative tag (e.g., -5 which appears as 251 unsigned), 
-          // we map it to its absolute value if it's within 1-20 range.
-          const absVal = Math.abs(val);
-          if (absVal > 0 && absVal <= 20) return absVal;
-          if (val === 0) return 1;
-          // Fallback for larger tags: map to a high range as stars usually have high tags
-          return 15;
-        }
-        // If it's an uncapped value (> 20), clamp to 20 for display as requested.
-        return Math.min(val, 20);
+        return this.normalizeAttr(val);
       };
 
       const positions: Record<string, number> = {
@@ -310,10 +318,10 @@ export class CM0102Parser {
         "AttackingMidfielder": readAt(20),
         "Attacker": readAt(21),
         "WingBack": readAt(22),
-        "RightSide": readAt(23),
+        "FreeRole": readAt(23),
         "LeftSide": readAt(24),
-        "CentreSide": readAt(25),
-        "FreeRole": readAt(26)
+        "RightSide": readAt(25),
+        "CentreSide": readAt(26)
       };
 
       const playerAttrs: Record<string, number> = {
@@ -323,43 +331,43 @@ export class CM0102Parser {
         "Anticipation": readAt(30),
         "Balance": readAt(31),
         "Bravery": readAt(32),
-        "Consistency": readAt(33),
-        "Corners": readAt(34),
-        "Crossing": readAt(35),
-        "Decisions": readAt(36),
-        "Dirtiness": readAt(37),
-        "Dribbling": readAt(38),
-        "Finishing": readAt(39),
-        "Flair": readAt(40),
-        "SetPieces": readAt(41),
-        "Handling": readAt(42),
-        "Heading": readAt(43),
-        "ImportantMatches": readAt(44),
-        "InjuryProneness": readAt(45),
-        "Jumping": readAt(46),
-        "Influence": readAt(47),
-        "LeftFoot": readAt(48),
-        "LongShots": readAt(49),
-        "Marking": readAt(50),
+        "Corners": readAt(33),
+        "Crossing": readAt(34),
+        "Decisions": readAt(35),
+        "Dirtiness": readAt(36),
+        "Dribbling": readAt(37),
+        "Finishing": readAt(38),
+        "Flair": readAt(39),
+        "SetPieces": readAt(40),
+        "Handling": readAt(41),
+        "Heading": readAt(42),
+        "ImportantMatches": readAt(43),
+        "InjuryProneness": readAt(44),
+        "Jumping": readAt(45),
+        "Influence": readAt(46),
+        "LeftFoot": readAt(47),
+        "LongShots": readAt(48),
+        "Marking": readAt(49),
+        "NaturalFitness": readAt(50),
         "OffTheBall": readAt(51),
-        "NaturalFitness": readAt(52),
-        "OneOnOnes": readAt(53),
-        "Pace": readAt(54),
-        "Passing": readAt(55),
-        "Penalties": readAt(56),
-        "Positioning": readAt(57),
-        "Reflexes": readAt(58),
-        "RightFoot": readAt(59),
-        "Stamina": readAt(60),
-        "Strength": readAt(61),
-        "Tackling": readAt(62),
-        "Teamwork": readAt(63),
-        "Technique": readAt(64),
-        "ThrowIns": readAt(65),
-        "Versatility": readAt(66),
+        "OneOnOnes": readAt(52),
+        "Pace": readAt(53),
+        "Passing": readAt(54),
+        "Penalties": readAt(55),
+        "Positioning": readAt(56),
+        "Reflexes": readAt(57),
+        "RightFoot": readAt(58),
+        "Stamina": readAt(59),
+        "Strength": readAt(60),
+        "Tackling": readAt(61),
+        "Teamwork": readAt(62),
+        "Technique": readAt(63),
+        "ThrowIns": readAt(64),
+        "Versatility": readAt(65),
+        "WorkRate": readAt(66),
         "Creativity": readAt(67),
-        "WorkRate": readAt(68),
-        "Morale": readAt(69)
+        "Consistency": readAt(68),
+        "Determination": readAt(69)
       };
 
       const staffData = staffMap.get(id);

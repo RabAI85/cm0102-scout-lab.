@@ -1,6 +1,6 @@
 {
-  "name": "CM 01/02 Save Explorer",
-  "description": "Parser and explorer for uncompressed Championship Manager 01/02 save files.",
+  "name": "Scout Lab",
+  "description": "Scouting tool for uncompressed Championship Manager 01/02 save files.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

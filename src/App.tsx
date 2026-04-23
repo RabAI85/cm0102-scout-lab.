@@ -8,16 +8,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { 
   Database, 
-  Users, 
-  Trophy, 
-  Globe, 
-  Clock,
   Search,
+  Bookmark,
+  GitCompare,
+  Briefcase,
+  Building2,
   ChevronLeft,
   ChevronRight,
+  Check
 } from 'lucide-react';
 import { CM0102Parser, Player } from './lib/CM0102Parser';
 import { ALL_ATTRIBUTES } from './lib/constants';
+import { mockPlayerData } from './lib/mockData';
 import ScoutLab from './components/ScoutLab';
 import PlayerProfile from './components/PlayerProfile';
 import ImportView from './components/ImportView';
@@ -59,25 +61,20 @@ function MainLayout({
         
         <div className="flex flex-col gap-6 w-full items-center">
           {[
-            { icon: Database, label: 'DATA' },
-            { icon: Search, label: 'SCOUT', active: true, path: '/' },
-            { icon: Users, label: 'SQUAD' },
-            { icon: Trophy, label: 'LEAGUE' },
-            { icon: Globe, label: 'WORLD' }
+            { icon: Database, label: 'DATA', id: 'data' },
+            { icon: Search, label: 'PLAYER', active: true, id: 'player' },
+            { icon: Bookmark, label: 'SHORTLIST', id: 'shortlist' },
+            { icon: GitCompare, label: 'COMPARE', id: 'compare' },
+            { icon: Briefcase, label: 'STAFF', id: 'staff' },
+            { icon: Building2, label: 'CLUB', id: 'club' }
           ].map((item, i) => (
-            <div key={i} onClick={() => item.path && navigate(item.path)} className="flex flex-col items-center gap-1 group cursor-pointer w-full px-2">
-              <div className={`p-2.5 rounded-xl transition-all ${item.active ? 'bg-[#E8F000] text-black shadow-[0_0_15px_rgba(232,240,0,0.3)]' : 'text-[#888888] hover:bg-[#1C1B1B] hover:text-white'}`}>
+            <div key={i} className="flex flex-col items-center gap-1 group cursor-pointer w-full px-2">
+              <div className={`p-2.5 rounded-xl transition-all ${item.active ? 'bg-scout-yellow text-black shadow-[0_0_15px_rgba(205,255,0,0.3)]' : 'text-[#444444] hover:bg-[#1C1B1B] hover:text-white'}`}>
                 <item.icon size={18} />
               </div>
-              {!isNavCollapsed && <span className={`text-[8px] font-bold tracking-widest ${item.active ? 'text-[#E8F000]' : 'text-[#888888]'}`}>{item.label}</span>}
+              {!isNavCollapsed && <span className={`text-[8px] font-bold tracking-widest ${item.active ? 'text-scout-yellow' : 'text-[#888888]'}`}>{item.label}</span>}
             </div>
           ))}
-        </div>
-
-        <div className="mt-auto">
-          <div className="p-2 text-[#888888] hover:text-white cursor-pointer mb-4">
-            <Clock size={18} />
-          </div>
         </div>
       </nav>
 
@@ -87,8 +84,8 @@ function MainLayout({
 }
 
 export default function App() {
-  const [view, setView] = useState<'import' | 'scout-lab'>('import');
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [view, setView] = useState<'import' | 'scout-lab'>('scout-lab');
+  const [players, setPlayers] = useState<Player[]>(mockPlayerData as unknown as Player[]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isParsing, setIsParsing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -118,6 +115,8 @@ export default function App() {
     categories: [] as string[],
     sides: [] as string[],
     minAge: 15, maxAge: 45, minCA: 0, maxCA: 200, minPA: 0, maxPA: 200, minValue: 0, maxValue: 50000000, minConsistency: 0, minImportantMatches: 0, minNaturalFitness: 0, maxInjuryProneness: 20,
+    attributes: {} as Record<string, number>,
+    enabledAttributes: [] as string[]
   });
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, colKey: string } | null>(null);
 
@@ -209,9 +208,13 @@ export default function App() {
     });
   };
 
-  const filteredPlayers = sortPlayers(players.filter(p => {
-    const matchesSearch = `${p.firstName} ${p.lastName} ${p.commonName} ${p.clubName} ${p.nationalityName}`.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPosition = filters.categories.length === 0 || filters.categories.some(cat => {
+  const filteredPlayers = players.filter(p => {
+    // 1. Search
+    const searchString = `${p.firstName} ${p.lastName} ${p.commonName} ${p.clubName} ${p.nationalityName}`.toLowerCase();
+    if (searchTerm && !searchString.includes(searchTerm.toLowerCase())) return false;
+
+    // 2. Position Filter
+    const matchesPosition = filters.categories.length === 0 || filters.categories.some((cat: string) => {
       let types: string[] = [];
       if (cat === 'GK') types = ['Goalkeeper'];
       if (cat === 'DEF') types = ['Defender', 'Sweeper'];
@@ -224,8 +227,23 @@ export default function App() {
       const sideMap: any = { 'Left': 'LeftSide', 'Right': 'RightSide', 'Centre': 'CentreSide' };
       return filters.sides.some(side => (p.positions as any)[sideMap[side]] > 10);
     });
-    return matchesSearch && matchesPosition; // Simplified for brevity in App.tsx
-  }));
+    if (!matchesPosition) return false;
+
+    // 3. Range Filters
+    if (p.age < filters.minAge || p.age > filters.maxAge) return false;
+    if (p.currentAbility < filters.minCA || p.currentAbility > filters.maxCA) return false;
+    if (p.potentialAbility < filters.minPA || p.potentialAbility > filters.maxPA) return false;
+    if (p.value < filters.minValue || p.value > filters.maxValue) return false;
+
+    // 4. Enabled Attribute Filters
+    for (const attr of filters.enabledAttributes) {
+      if ((p.attributes[attr] || 0) < (filters.attributes[attr] || 0)) return false;
+    }
+
+    return true;
+  });
+
+  const sortedList = sortPlayers(filteredPlayers);
 
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -234,8 +252,8 @@ export default function App() {
     } else { setSortBy(field); setSortDir('desc'); }
   };
 
-  const totalPages = Math.ceil(filteredPlayers.length / itemsPerPage);
-  const currentItems = filteredPlayers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(sortedList.length / itemsPerPage);
+  const currentItems = sortedList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const toggleCategory = (cat: string) => {
     setFilters(f => ({ ...f, categories: f.categories.includes(cat) ? f.categories.filter(c => c !== cat) : [...f.categories, cat] }));
@@ -245,9 +263,20 @@ export default function App() {
     setFilters(f => ({ ...f, sides: f.sides.includes(side) ? f.sides.filter(s => s !== side) : [...f.sides, side] }));
   };
 
+  const toggleAttributeEnabled = (attr: string) => {
+    setFilters(f => ({
+      ...f,
+      enabledAttributes: f.enabledAttributes.includes(attr)
+        ? f.enabledAttributes.filter(a => a !== attr)
+        : [...f.enabledAttributes, attr]
+    }));
+  };
+
   const clearFilters = () => {
     setFilters({
       categories: [], sides: [], minAge: 15, maxAge: 45, minCA: 0, maxCA: 200, minPA: 0, maxPA: 200, minValue: 0, maxValue: 50000000, minConsistency: 0, minImportantMatches: 0, minNaturalFitness: 0, maxInjuryProneness: 20,
+      attributes: {},
+      enabledAttributes: []
     });
     setSearchTerm('');
   };
@@ -270,42 +299,59 @@ export default function App() {
         {/* Database View */}
         <Route path="/scout-lab" element={
           <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView}>
-            <aside className={`${isFilterCollapsed ? 'w-0 opacity-0 px-0' : 'w-[280px] p-6 opacity-100'} bg-[#1C1B1B] flex flex-col shrink-0 overflow-y-auto scrollbar-hide shadow-2xl z-10 transition-all duration-300 relative group/sidebar`}>
-              <div className="space-y-6">
-                <div className="flex justify-between items-end">
+            <aside className={`${isFilterCollapsed ? 'w-0 opacity-0 px-0' : 'w-[280px] opacity-100'} bg-[#0E0E0E] flex flex-col shrink-0 border-r border-[#1C1B1B] transition-all duration-300 relative group/sidebar`}>
+              <div className="flex flex-col h-full">
+                <div className="p-6 border-b border-[#1C1B1B] flex justify-between items-end shrink-0">
                   <h2 className="font-bebas text-2xl text-white tracking-widest">FILTERS</h2>
-                  <button onClick={clearFilters} className="text-[#E8F000] text-[9px] font-bold tracking-widest uppercase hover:underline">CLEAR ALL</button>
+                  <button onClick={clearFilters} className="text-scout-yellow text-[9px] font-bold tracking-widest uppercase hover:underline">CLEAR ALL</button>
                 </div>
+                
                 <button 
                   onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                  className="absolute -right-3 top-[34px] z-50 w-6 h-6 rounded-full bg-white flex items-center justify-center transition-all duration-200 hover:bg-[#E8F000] group/toggle shadow-lg"
+                  className="absolute -right-3 top-[34px] z-50 w-6 h-6 rounded-full bg-white flex items-center justify-center transition-all duration-200 hover:bg-scout-yellow group/toggle shadow-lg"
                 >
-                  <ChevronLeft size={14} className="text-[#E8F000] group-hover/toggle:text-black transition-colors" />
+                  <ChevronLeft size={14} className="text-scout-yellow group-hover/toggle:text-black transition-colors" />
                 </button>
-                <div className="space-y-4">
-                  <h3 className="text-[9px] font-black text-[#888888] tracking-[0.2em] uppercase">POSITION</h3>
-                  <div className="space-y-3">
-                    <button onClick={() => toggleCategory('GK')} className={`w-full py-1.5 rounded text-[9px] font-bold transition-all ${filters.categories.includes('GK') ? 'bg-[#E8F000] text-black' : 'bg-[#2A2A2A] text-white hover:bg-[#333333]'}`}>GK</button>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {['DEF', 'MID', 'ATT'].map(cat => (
-                        <div key={cat} className="space-y-1.5">
-                          <button onClick={() => toggleCategory(cat)} className={`w-full py-1.5 rounded text-[9px] font-bold transition-all ${filters.categories.includes(cat) ? 'bg-[#E8F000] text-black' : 'bg-[#2A2A2A] text-white hover:bg-[#333333]'}`}>{cat}</button>
-                          <div className="grid grid-cols-3 gap-0.5">
-                            {['Left', 'Centre', 'Right'].map(side => (
-                              <button key={side} onClick={() => toggleSide(side)} className={`w-full py-1 rounded text-[7px] font-bold transition-all ${filters.sides.includes(side) ? 'bg-[#E8F000] text-black' : 'bg-[#2A2A2A] text-[#888888] hover:bg-[#333333]'}`}>{side[0]}</button>
-                            ))}
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                  <div className="space-y-4">
+                    {[...ALL_ATTRIBUTES].sort().map(attr => (
+                      <div key={attr} className="space-y-2">
+                        <div className="flex justify-between items-center px-1">
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => toggleAttributeEnabled(attr)}
+                              className={`w-3.5 h-3.5 rounded-sm border transition-colors flex items-center justify-center ${filters.enabledAttributes.includes(attr) ? 'bg-scout-yellow border-scout-yellow' : 'bg-[#1C1B1B] border-[#2A2A2A]'}`}
+                            >
+                              {filters.enabledAttributes.includes(attr) && <Check size={10} className="text-black stroke-[4px]" />}
+                            </button>
+                            <label className="text-[10px] font-black text-[#888888] tracking-[0.1em] uppercase">{attr}</label>
                           </div>
+                          <span className={`font-mono text-[10px] font-bold ${filters.enabledAttributes.includes(attr) ? 'text-scout-yellow' : 'text-[#444444]'}`}>
+                            {filters.attributes[attr] || 0}
+                          </span>
                         </div>
-                      ))}
-                    </div>
+                        <input 
+                          type="range"
+                          min="0"
+                          max="20"
+                          disabled={!filters.enabledAttributes.includes(attr)}
+                          value={filters.attributes[attr] || 0}
+                          onChange={(e) => setFilters(f => ({
+                            ...f,
+                            attributes: { ...f.attributes, [attr]: parseInt(e.target.value) }
+                          }))}
+                          className={`w-full accent-scout-yellow ${!filters.enabledAttributes.includes(attr) ? 'opacity-20 cursor-not-allowed' : ''}`}
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
-                {/* Simplified filters for brevity as they are already functional */}
               </div>
             </aside>
             <ScoutLab 
               players={players} searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-              filteredPlayers={filteredPlayers} currentItems={currentItems} currentPage={currentPage}
+              sortedPlayers={sortedList} currentItems={currentItems} currentPage={currentPage}
               setCurrentPage={setCurrentPage} totalPages={totalPages} itemsPerPage={itemsPerPage}
               sortBy={sortBy} sortDir={sortDir} handleSort={handleSort} columnOrder={columnOrder} setColumnOrder={setColumnOrder}
               columnWidths={columnWidths} setColumnWidths={setColumnWidths} isFilterCollapsed={isFilterCollapsed} setIsFilterCollapsed={setIsFilterCollapsed}
