@@ -198,8 +198,8 @@ export default function PlayerProfile({ players }: PlayerProfileProps) {
                     {/* Inline Radar Chart - Proportional Size */}
                     <div className="mt-4 bg-[#1C1B1B] rounded-xl p-3 flex flex-col items-center border border-[#2A2A2A]">
                       <span className="text-[#888888] text-[11px] font-bold tracking-[0.2em] mb-2 uppercase">SPREAD</span>
-                      <div className="h-[180px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-[180px] w-full relative">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                           <RadarChart cx="50%" cy="50%" outerRadius="65" data={radarData}>
                             <PolarGrid stroke="#2A2A2A" />
                             <PolarAngleAxis 
@@ -226,7 +226,7 @@ export default function PlayerProfile({ players }: PlayerProfileProps) {
 
           {/* Hidden Attributes Section */}
           <div className="pt-4">
-             <h3 className="text-[#E8F000] text-[12px] font-bold tracking-[0.2em] uppercase mb-[16px]">HIDDEN ATTRIBUTES</h3>
+             <h3 className="text-scout-yellow text-[12px] font-bold tracking-[0.2em] uppercase mb-[16px]">HIDDEN ATTRIBUTES</h3>
              <div className="grid grid-cols-3 gap-x-12">
                 {[0, 1, 2].map((colIdx) => {
                   const itemsPerCol = Math.ceil(hiddenAttrs.length / 3);

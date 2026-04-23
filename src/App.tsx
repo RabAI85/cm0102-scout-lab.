@@ -327,7 +327,7 @@ export default function App() {
                             </button>
                             <label className="text-[10px] font-black text-[#888888] tracking-[0.1em] uppercase">{attr}</label>
                           </div>
-                          <span className={`font-mono text-[10px] font-bold ${filters.enabledAttributes.includes(attr) ? 'text-scout-yellow' : 'text-[#444444]'}`}>
+                          <span className={`font-sans text-[10px] font-bold ${filters.enabledAttributes.includes(attr) ? 'text-scout-yellow' : 'text-[#444444]'}`}>
                             {filters.attributes[attr] || 0}
                           </span>
                         </div>

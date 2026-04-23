@@ -98,7 +98,7 @@ export default function ScoutLab({
               placeholder="SEARCH DATABASE"
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="bg-[#1C1B1B] border-none rounded-md pl-9 pr-3 py-1.5 text-[10px] font-mono text-white focus:ring-1 focus:ring-scout-yellow w-56 outline-none transition-all"
+              className="bg-[#1C1B1B] border-none rounded-md pl-9 pr-3 py-1.5 text-[10px] font-sans text-white focus:ring-1 focus:ring-scout-yellow w-56 outline-none transition-all"
             />
           </div>
           {searchTerm && (
