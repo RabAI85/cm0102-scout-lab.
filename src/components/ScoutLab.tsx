@@ -7,6 +7,7 @@ import {
   ChevronRight, 
   X, 
   TrendingUp,
+  Star
 } from 'lucide-react';
 import { Player } from '../lib/CM0102Parser';
 import { getFlagUrl, formatCurrency } from '../lib/constants';
@@ -34,6 +35,9 @@ interface ScoutLabProps {
   setContextMenu: (m: { x: number, y: number, colKey: string } | null) => void;
   filters: any;
   ALL_ATTRIBUTES: string[];
+  title?: string;
+  shortlist: number[];
+  toggleShortlist: (id: number) => void;
 }
 
 export default function ScoutLab({
@@ -56,17 +60,19 @@ export default function ScoutLab({
   setIsFilterCollapsed,
   setContextMenu,
   filters,
-  ALL_ATTRIBUTES
+  ALL_ATTRIBUTES,
+  title = "GLOBAL PLAYER DATABASE",
+  shortlist,
+  toggleShortlist
 }: ScoutLabProps) {
   const navigate = useNavigate();
 
-  const isPosActive = (pos: string) => filters.categories.some((cat: string) => {
-    let types: string[] = [];
-    if (cat === 'GK') types = ['Goalkeeper'];
-    if (cat === 'DEF') types = ['Defender', 'Sweeper'];
-    if (cat === 'MID') types = ['DefensiveMidfielder', 'Midfielder', 'AttackingMidfielder'];
-    if (cat === 'ATT') types = ['Attacker'];
-    return types.includes(pos);
+  const isPosActive = (pos: string) => filters.categories.length === 0 || filters.categories.some((cat: string) => {
+    if (cat === 'GK') return pos === 'GK';
+    if (cat === 'DEF') return pos === 'D' || pos === 'SW' || pos === 'WB';
+    if (cat === 'MID') return pos === 'M' || pos === 'DM' || pos === 'AM';
+    if (cat === 'ATT') return pos === 'AT' || pos === 'ST';
+    return false;
   });
 
   return (
@@ -83,9 +89,9 @@ export default function ScoutLab({
             </button>
           )}
           <div className="flex items-baseline gap-3">
-            <h2 className="font-bebas text-[14px] text-scout-yellow tracking-widest leading-none translate-y-[1px]">GLOBAL DATABASE</h2>
+            <h2 className="font-bebas text-[14px] text-scout-yellow tracking-widest leading-none translate-y-[1px]">{title}</h2>
             <div className="font-sans text-[8px] tracking-[0.2em] font-bold text-white/40 uppercase whitespace-nowrap">
-              {sortedPlayers.length.toLocaleString()} PLAYERS LOADED
+              {sortedPlayers.length.toLocaleString()} {title.includes('SHORTLIST') ? 'SAVED' : 'PLAYERS LOADED'}
             </div>
           </div>
         </div>
@@ -118,6 +124,7 @@ export default function ScoutLab({
                 <tr className="bg-[#1C1B1B]/90 backdrop-blur-md text-white text-[13px] uppercase tracking-[0.1em] font-black w-full flex">
                   {columnOrder.map((colKey) => {
                     const columns: any = {
+                      save: { label: '', textAlign: 'center', sortKey: null },
                       name: { label: 'PLAYER NAME', sortKey: 'name' },
                       flag: { label: '', sortKey: 'nationalityName' },
                       pos: { label: 'POS', textAlign: 'center', sortKey: 'pos' },
@@ -231,15 +238,26 @@ export default function ScoutLab({
                   return (
                     <tr 
                       key={player.id} 
-                      onClick={() => navigate(`/player/${player.id}`)}
                       className="hover:bg-[#2A2A2A] text-[#E0E0E0] transition-colors cursor-pointer group flex w-full"
                     >
                       {columnOrder.map(colKey => {
                         const width = `${columnWidths[colKey]}px`;
                         switch (colKey) {
+                          case 'save':
+                            const isSaved = shortlist.includes(player.id);
+                            return (
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center flex items-center justify-center">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleShortlist(player.id); }}
+                                  className={`transition-all ${isSaved ? 'text-scout-yellow fill-scout-yellow scale-110' : 'text-[#444444] hover:text-white'}`}
+                                >
+                                  <Star size={14} />
+                                </button>
+                              </td>
+                            );
                           case 'name':
                             return (
-                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] pl-6 overflow-hidden flex items-center">
+                              <td key={colKey} style={{ width, flexShrink: 0 }} onClick={() => navigate(`/player/${player.id}`)} className="p-[6px] pl-6 overflow-hidden flex items-center">
                                 <div className="font-sans text-[14px] text-white uppercase tracking-tighter group-hover:text-scout-yellow transition-colors truncate font-medium flex items-center overflow-hidden whitespace-nowrap">{player.firstName} {player.lastName}</div>
                               </td>
                             );
@@ -255,12 +273,12 @@ export default function ScoutLab({
                               </td>
                             );
                           case 'pos':
-                            const getPrimaryPos = () => {
+      const getPrimaryPos = () => {
                               const vals = [
-                                { label: 'GK', val: (player.positions as any)['Goalkeeper'] || 0 },
-                                { label: 'D', val: (player.positions as any)['Defender'] || 0 },
-                                { label: 'M', val: (player.positions as any)['Midfielder'] || 0 },
-                                { label: 'AT', val: (player.positions as any)['Attacker'] || 0 }
+                                { label: 'GK', val: (player.positions as any)['GK'] || 0 },
+                                { label: 'D', val: Object.entries(player.positions).filter(([k]) => k.startsWith('D') || k === 'SW' || k.startsWith('WB')).reduce((sum, [_, v]) => Math.max(sum, v), 0) },
+                                { label: 'M', val: Object.entries(player.positions).filter(([k]) => k.startsWith('M') || k.startsWith('DM') || k.startsWith('AM')).reduce((sum, [_, v]) => Math.max(sum, v), 0) },
+                                { label: 'AT', val: Object.entries(player.positions).filter(([k]) => k.startsWith('ST')).reduce((sum, [_, v]) => Math.max(sum, v), 0) }
                               ];
                               return vals.reduce((prev, curr) => (curr.val > prev.val ? curr : prev), vals[0]).label;
                             };
@@ -273,44 +291,44 @@ export default function ScoutLab({
                               </td>
                             );
                           case 'age':
-                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans text-white/90 flex items-center justify-center">{player.age}</td>;
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-outfit text-white/90 flex items-center justify-center">{player.age}</td>;
                           case 'clubName':
                             return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-[14px] text-white uppercase tracking-tighter truncate font-medium flex items-center overflow-hidden whitespace-nowrap">{player.clubName}</td>;
                           case 'value':
                             return (
-                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-sans font-bold text-white tracking-tighter flex items-center justify-end">
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-outfit font-bold text-white tracking-tighter flex items-center justify-end">
                                 {formatCurrency(player.value)}
                               </td>
                             );
                           case 'wage':
                             return (
-                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-sans font-bold text-scout-yellow tracking-tighter flex items-center justify-end">
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-outfit font-bold text-scout-yellow tracking-tighter flex items-center justify-end">
                                 {formatCurrency(player.wage).replace('.00', '').replace('M', 'K')}/W
                               </td>
                             );
                           case 'currentAbility':
                             return (
-                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-black text-scout-yellow flex items-center justify-center">
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-outfit font-black text-scout-yellow flex items-center justify-center">
                                 {player.currentAbility}
                               </td>
                             );
                           case 'potentialAbility':
                             return (
-                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-black text-scout-yellow flex items-center justify-center">
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-outfit font-black text-scout-yellow flex items-center justify-center">
                                 {player.potentialAbility}
                               </td>
                             );
                           case 'injuryProne':
-                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-bold text-white/70 flex items-center justify-center">{injuryProne}</td>;
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-outfit font-bold text-white/70 flex items-center justify-center">{injuryProne}</td>;
                           case 'impMatches':
-                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-bold text-white/70 flex items-center justify-center">{impMatches}</td>;
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-outfit font-bold text-white/70 flex items-center justify-center">{impMatches}</td>;
                           case 'consistency':
-                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-bold text-white/70 flex items-center justify-center">{consistency}</td>;
+                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-outfit font-bold text-white/70 flex items-center justify-center">{consistency}</td>;
                           default:
                             if (colKey.startsWith('attributes.')) {
                               const attr = colKey.split('.')[1];
                               const val = player.attributes[attr] || 0;
-                              return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-sans font-bold text-white flex items-center justify-center opacity-70">{val}</td>;
+                              return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-outfit font-bold text-white flex items-center justify-center opacity-70">{val}</td>;
                             }
                             return null;
                         }

@@ -12,6 +12,7 @@ interface ImportViewProps {
   importProgress: number;
   stats: any;
   setView: (v: 'scout-lab') => void;
+  logs: any[];
 }
 
 export default function ImportView({
@@ -22,7 +23,8 @@ export default function ImportView({
   fileName,
   importProgress,
   stats,
-  setView
+  setView,
+  logs
 }: ImportViewProps) {
   const isLoaded = players.length > 0 && !isParsing && importProgress >= 100;
 
@@ -65,11 +67,23 @@ export default function ImportView({
                   <p className="font-sans text-sm text-[#888888] tracking-widest uppercase italic">Awaiting save file...</p>
                   
                   {isParsing && (
-                    <div className="w-48 space-y-2 mt-4 text-center">
-                       <div className="font-bebas text-lg text-scout-yellow tracking-widest">{Math.round(importProgress)}%</div>
-                       <div className="w-full bg-[#2A2A2A] h-1 rounded-full overflow-hidden">
-                          <div className="bg-scout-yellow h-full transition-all duration-300" style={{ width: `${importProgress}%` }} />
+                    <div className="w-full space-y-4 mt-4">
+                       <div className="w-48 mx-auto space-y-2">
+                         <div className="font-bebas text-lg text-scout-yellow tracking-widest">{Math.round(importProgress)}%</div>
+                         <div className="w-full bg-[#2A2A2A] h-1 rounded-full overflow-hidden">
+                            <div className="bg-scout-yellow h-full transition-all duration-300" style={{ width: `${importProgress}%` }} />
+                         </div>
                        </div>
+
+                       {/* Log Area during parsing */}
+                       <div className="w-full bg-black/40 border border-[#1C1B1B] rounded-lg p-3 h-[120px] overflow-y-auto font-mono text-[9px] space-y-1 scrollbar-hide text-left">
+                        {logs.map((log: any, i: number) => (
+                          <div key={i} className={`flex gap-3 ${log.type === 'error' ? 'text-red-500' : log.type === 'success' ? 'text-scout-yellow' : 'text-[#666666]'}`}>
+                            <span className="shrink-0 opacity-50">[{log.timestamp}]</span>
+                            <span className="leading-relaxed">{log.message}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -79,23 +93,33 @@ export default function ImportView({
                     <div className="w-6 h-6 flex items-center justify-center leading-none text-xl font-black">✓</div>
                   </div>
 
-                  <div className="space-y-1 mb-8">
-                    <div className="font-bebas text-[72px] leading-none text-white tracking-tight font-bold">
-                      <span className="font-sans">{stats.totalRecords.toLocaleString()}</span> PLAYERS LOADED
-                    </div>
-                    <div className="font-sans text-[12px] tracking-[0.2em] text-[#888888] uppercase font-medium">
-                      SQUAD DATABASE READY
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2 w-full mb-10">
-                    {Object.entries(stats.positions).map(([pos, count]: [string, any]) => (
-                      <div key={pos} className="bg-[#2A2A2A] p-3 rounded-lg space-y-1">
-                        <div className="font-sans text-2xl text-white tracking-wider font-bold">{count.toLocaleString()}</div>
-                        <div className="font-sans text-[9px] text-[#888888] uppercase tracking-widest font-bold">{pos}</div>
+                    <div className="space-y-1 mb-8">
+                      <div className="font-bebas text-[72px] leading-none text-white tracking-tight font-bold">
+                        <span className="font-outfit">{stats.totalRecords.toLocaleString()}</span> PLAYERS LOADED
                       </div>
-                    ))}
-                  </div>
+                      <div className="font-sans text-[12px] tracking-[0.2em] text-[#888888] uppercase font-medium">
+                        SQUAD DATABASE READY
+                      </div>
+                    </div>
+
+                    {/* Log Area after loading */}
+                    <div className="w-full bg-black/40 border border-[#1C1B1B] rounded-lg p-3 mb-6 h-[100px] overflow-y-auto font-mono text-[9px] space-y-1 scrollbar-hide text-left">
+                      {logs.map((log: any, i: number) => (
+                        <div key={i} className={`flex gap-3 ${log.type === 'error' ? 'text-red-500' : log.type === 'success' ? 'text-scout-yellow' : 'text-[#666666]'}`}>
+                          <span className="shrink-0 opacity-50">[{log.timestamp}]</span>
+                          <span className="leading-relaxed">{log.message}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2 w-full mb-10">
+                      {Object.entries(stats.positions).map(([pos, count]: [string, any]) => (
+                        <div key={pos} className="bg-[#2A2A2A] p-3 rounded-lg space-y-1">
+                          <div className="font-outfit text-2xl text-white tracking-wider font-bold">{count.toLocaleString()}</div>
+                          <div className="font-sans text-[9px] text-[#888888] uppercase tracking-widest font-bold">{pos}</div>
+                        </div>
+                      ))}
+                    </div>
 
                   <div className="w-full flex justify-between items-center py-4 border-t border-[#2A2A2A]/30 mt-auto">
                     <div className="flex items-center gap-2">

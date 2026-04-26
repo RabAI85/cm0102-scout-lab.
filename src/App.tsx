@@ -17,12 +17,14 @@ import {
   ChevronRight,
   Check
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { CM0102Parser, Player } from './lib/CM0102Parser';
-import { ALL_ATTRIBUTES } from './lib/constants';
 import { mockPlayerData } from './lib/mockData';
+import { ALL_ATTRIBUTES } from './lib/constants';
 import ScoutLab from './components/ScoutLab';
 import PlayerProfile from './components/PlayerProfile';
 import ImportView from './components/ImportView';
+import ComparePlayers from './components/ComparePlayers';
 
 interface LogEntry {
   message: string;
@@ -30,16 +32,20 @@ interface LogEntry {
   timestamp: string;
 }
 
+type ViewType = 'import' | 'scout-lab' | 'shortlist';
+
 function MainLayout({ 
   children, 
   isNavCollapsed, 
   setIsNavCollapsed, 
-  setView 
+  setView,
+  currentView
 }: { 
   children: React.ReactNode; 
   isNavCollapsed: boolean; 
   setIsNavCollapsed: (b: boolean) => void;
-  setView: (v: 'import') => void;
+  setView: (v: ViewType) => void;
+  currentView: ViewType;
 }) {
   const navigate = useNavigate();
 
@@ -61,41 +67,81 @@ function MainLayout({
         
         <div className="flex flex-col gap-6 w-full items-center">
           {[
-            { icon: Database, label: 'DATA', id: 'data' },
-            { icon: Search, label: 'PLAYER', active: true, id: 'player' },
-            { icon: Bookmark, label: 'SHORTLIST', id: 'shortlist' },
-            { icon: GitCompare, label: 'COMPARE', id: 'compare' },
-            { icon: Briefcase, label: 'STAFF', id: 'staff' },
-            { icon: Building2, label: 'CLUB', id: 'club' }
+            { icon: Search, label: 'DATABASE', id: 'scout-lab', path: '/scout-lab' },
+            { icon: Bookmark, label: 'SHORTLIST', id: 'shortlist', path: '/shortlist' },
+            { icon: GitCompare, label: 'COMPARE', id: 'compare', path: '/compare' },
+            { icon: Briefcase, label: 'STAFF', id: 'staff', path: '#' },
+            { icon: Building2, label: 'CLUB', id: 'club', path: '#' }
           ].map((item, i) => (
-            <div key={i} className="flex flex-col items-center gap-1 group cursor-pointer w-full px-2">
-              <div className={`p-2.5 rounded-xl transition-all ${item.active ? 'bg-scout-yellow text-black shadow-[0_0_15px_rgba(205,255,0,0.3)]' : 'text-[#444444] hover:bg-[#1C1B1B] hover:text-white'}`}>
+            <div 
+              key={i} 
+              onClick={() => { if(item.path !== '#') { setView(item.id as ViewType); navigate(item.path); } }}
+              className="flex flex-col items-center gap-1 group cursor-pointer w-full px-2"
+            >
+              <div className={`p-2.5 rounded-xl transition-all ${currentView === item.id ? 'bg-scout-yellow text-black shadow-[0_0_15px_rgba(205,255,0,0.3)]' : 'text-[#444444] hover:bg-[#1C1B1B] hover:text-white'}`}>
                 <item.icon size={18} />
               </div>
-              {!isNavCollapsed && <span className={`text-[8px] font-bold tracking-widest ${item.active ? 'text-scout-yellow' : 'text-[#888888]'}`}>{item.label}</span>}
+              {!isNavCollapsed && <span className={`text-[8px] font-bold tracking-widest ${currentView === item.id ? 'text-scout-yellow' : 'text-[#888888] group-hover:text-white'}`}>{item.label}</span>}
             </div>
           ))}
         </div>
       </nav>
 
-      {children}
+      <motion.div 
+        key={currentView}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className="flex-1 flex overflow-hidden"
+      >
+        {children}
+      </motion.div>
     </div>
   );
 }
 
 export default function App() {
-  const [view, setView] = useState<'import' | 'scout-lab'>('scout-lab');
+  const [view, setView] = useState<ViewType>('scout-lab');
   const [players, setPlayers] = useState<Player[]>(mockPlayerData as unknown as Player[]);
+  const [shortlist, setShortlist] = useState<number[]>([1, 2, 5]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [gameDate, setGameDate] = useState<Date | null>(new Date(2001, 7, 1));
   const [isParsing, setIsParsing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [stats, setStats] = useState({
-    avgCA: 0,
-    clubsFound: 0,
+    avgCA: 142,
+    clubsFound: 5,
     latency: 0,
-    totalRecords: 0,
-    positions: { GK: 0, DEF: 0, MID: 0, FWD: 0 }
+    totalRecords: mockPlayerData.length,
+    positions: { GK: 0, DEF: 2, MID: 2, FWD: 2 }
   });
+
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+
+  const [compareSlots, setCompareSlots] = useState<{ slot1: number | null, slot2: number | null }>({
+    slot1: null,
+    slot2: null
+  });
+
+  const addToCompare = (id: number, slot: 1 | 2) => {
+    setCompareSlots(prev => ({
+      ...prev,
+      [slot === 1 ? 'slot1' : 'slot2']: id
+    }));
+  };
+
+  const removeFromCompare = (slot: 1 | 2) => {
+    setCompareSlots(prev => ({
+      ...prev,
+      [slot === 1 ? 'slot1' : 'slot2']: null
+    }));
+  };
+
+  const toggleShortlist = (id: number) => {
+    setShortlist(prev => 
+      prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
+    );
+  };
   
   // Shared Scouting States
   const [searchTerm, setSearchTerm] = useState('');
@@ -106,10 +152,10 @@ export default function App() {
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
   const [columnOrder, setColumnOrder] = useState<string[]>([
-    'name', 'flag', 'pos', 'age', 'clubName', 'value', 'wage', 'currentAbility', 'potentialAbility', 'injuryProne', 'impMatches', 'consistency'
+    'save', 'name', 'flag', 'pos', 'age', 'clubName', 'value', 'wage', 'currentAbility', 'potentialAbility', 'injuryProne', 'impMatches', 'consistency'
   ]);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-    name: 240, flag: 40, pos: 70, age: 55, clubName: 160, value: 100, wage: 100, currentAbility: 55, potentialAbility: 55, injuryProne: 55, impMatches: 55, consistency: 55,
+    save: 40, name: 240, flag: 40, pos: 70, age: 55, clubName: 160, value: 100, wage: 100, currentAbility: 55, potentialAbility: 55, injuryProne: 55, impMatches: 55, consistency: 55,
   });
   const [filters, setFilters] = useState({
     categories: [] as string[],
@@ -149,7 +195,7 @@ export default function App() {
     try {
       const buffer = await file.arrayBuffer();
       const parser = new CM0102Parser(buffer, (msg, type) => addLog(msg, type));
-      const parsedPlayers = parser.getPlayers();
+      const { players: parsedPlayers, positionCounts, gameDate: parsedDate } = await parser.parse();
       
       clearInterval(progressInterval);
       setImportProgress(100);
@@ -158,24 +204,22 @@ export default function App() {
       const latency = Math.round(endTime - startTime);
       
       const uniqueClubs = new Set(parsedPlayers.map(p => p.clubName)).size;
-      const posCounts = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
-      parsedPlayers.forEach(p => {
-        if (p.positions["Goalkeeper"] > 10) posCounts.GK++;
-        else if (p.positions["Attacker"] > 10) posCounts.FWD++;
-        else if (p.positions["Defender"] > 10 || p.positions["Sweeper"] > 10) posCounts.DEF++;
-        else posCounts.MID++;
-      });
 
       setPlayers(parsedPlayers);
+      setGameDate(parsedDate);
       setStats({
-        avgCA: 0, // Simplified
+        avgCA: 0,
         clubsFound: uniqueClubs,
         latency,
         totalRecords: parsedPlayers.length,
-        positions: posCounts
+        positions: positionCounts
       });
       
-      addLog(`Ready. Table view populated in ${latency}ms.`, 'success');
+      addLog(`Ready. Table view populated with ${parsedPlayers.length} players. Game Date: ${parsedDate?.toDateString() || 'N/A'}`, 'success');
+      if (parsedPlayers.length > 0) {
+        const sample = parsedPlayers[0];
+        addLog(`Sample player: ${sample.firstName} ${sample.lastName}, Age: ${sample.age}, Club: ${sample.clubName}`, 'info');
+      }
       setIsParsing(false);
     } catch (error) {
       clearInterval(progressInterval);
@@ -215,25 +259,32 @@ export default function App() {
 
     // 2. Position Filter
     const matchesPosition = filters.categories.length === 0 || filters.categories.some((cat: string) => {
-      let types: string[] = [];
-      if (cat === 'GK') types = ['Goalkeeper'];
-      if (cat === 'DEF') types = ['Defender', 'Sweeper'];
-      if (cat === 'MID') types = ['DefensiveMidfielder', 'Midfielder', 'AttackingMidfielder'];
-      if (cat === 'ATT') types = ['Attacker'];
-      const hasType = types.some(t => (p.positions as any)[t] > 10);
-      if (!hasType) return false;
-      if (cat === 'GK') return true;
-      if (filters.sides.length === 0) return true;
-      const sideMap: any = { 'Left': 'LeftSide', 'Right': 'RightSide', 'Centre': 'CentreSide' };
-      return filters.sides.some(side => (p.positions as any)[sideMap[side]] > 10);
+      const posKeys = Object.keys(p.positions);
+      let matchesCategory = false;
+      
+      if (cat === 'GK') matchesCategory = posKeys.includes('GK');
+      if (cat === 'DEF') matchesCategory = posKeys.some(k => k === 'SW' || k.startsWith('D') || k.startsWith('WB'));
+      if (cat === 'MID') matchesCategory = posKeys.some(k => k.startsWith('DM') || k.startsWith('M') || k.startsWith('AM'));
+      if (cat === 'ATT') matchesCategory = posKeys.some(k => k.startsWith('ST'));
+
+      if (!matchesCategory) return false;
+      
+      // If we matched the category, check sides if any sides are selected
+      if (cat === 'GK' || filters.sides.length === 0) return true;
+      
+      const sideMap: any = { 'Left': 'L', 'Right': 'R', 'Centre': 'C' };
+      return filters.sides.some(side => {
+        const sideLetter = sideMap[side];
+        return posKeys.some(k => k.endsWith(sideLetter));
+      });
     });
     if (!matchesPosition) return false;
 
     // 3. Range Filters
-    if (p.age < filters.minAge || p.age > filters.maxAge) return false;
+    if (p.age > 0 && (p.age < filters.minAge || p.age > filters.maxAge)) return false;
     if (p.currentAbility < filters.minCA || p.currentAbility > filters.maxCA) return false;
     if (p.potentialAbility < filters.minPA || p.potentialAbility > filters.maxPA) return false;
-    if (p.value < filters.minValue || p.value > filters.maxValue) return false;
+    if (p.value > 0 && (p.value < filters.minValue || p.value > filters.maxValue)) return false;
 
     // 4. Enabled Attribute Filters
     for (const attr of filters.enabledAttributes) {
@@ -290,6 +341,7 @@ export default function App() {
             <ImportView 
               fileInputRef={fileInputRef} handleFileUpload={handleFileUpload} isParsing={isParsing}
               players={players} fileName={fileName} importProgress={importProgress} stats={stats} setView={setView}
+              logs={logs}
             />
           ) : (
             <Navigate to="/scout-lab" />
@@ -298,7 +350,7 @@ export default function App() {
 
         {/* Database View */}
         <Route path="/scout-lab" element={
-          <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView}>
+          <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView} currentView={view}>
             <aside className={`${isFilterCollapsed ? 'w-0 opacity-0 px-0' : 'w-[280px] opacity-100'} bg-[#0E0E0E] flex flex-col shrink-0 border-r border-[#1C1B1B] transition-all duration-300 relative group/sidebar`}>
               <div className="flex flex-col h-full">
                 <div className="p-6 border-b border-[#1C1B1B] flex justify-between items-end shrink-0">
@@ -350,20 +402,92 @@ export default function App() {
               </div>
             </aside>
             <ScoutLab 
-              players={players} searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-              sortedPlayers={sortedList} currentItems={currentItems} currentPage={currentPage}
-              setCurrentPage={setCurrentPage} totalPages={totalPages} itemsPerPage={itemsPerPage}
-              sortBy={sortBy} sortDir={sortDir} handleSort={handleSort} columnOrder={columnOrder} setColumnOrder={setColumnOrder}
-              columnWidths={columnWidths} setColumnWidths={setColumnWidths} isFilterCollapsed={isFilterCollapsed} setIsFilterCollapsed={setIsFilterCollapsed}
-              contextMenu={contextMenu} setContextMenu={setContextMenu} filters={filters} ALL_ATTRIBUTES={ALL_ATTRIBUTES}
+              players={players} 
+              searchTerm={searchTerm} 
+              setSearchTerm={setSearchTerm}
+              sortedPlayers={sortedList}
+              currentItems={currentItems}
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
+              totalPages={totalPages}
+              itemsPerPage={itemsPerPage}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              handleSort={handleSort}
+              columnOrder={columnOrder}
+              setColumnOrder={setColumnOrder}
+              columnWidths={columnWidths}
+              setColumnWidths={setColumnWidths}
+              isFilterCollapsed={isFilterCollapsed}
+              setIsFilterCollapsed={setIsFilterCollapsed}
+              contextMenu={contextMenu}
+              setContextMenu={setContextMenu}
+              filters={filters}
+              ALL_ATTRIBUTES={ALL_ATTRIBUTES}
+              shortlist={shortlist}
+              toggleShortlist={toggleShortlist}
+            />
+          </MainLayout>
+        } />
+
+        {/* Shortlist View */}
+        <Route path="/shortlist" element={
+          <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView} currentView={view}>
+             <ScoutLab 
+              players={players.filter(p => shortlist.includes(p.id))} 
+              searchTerm={searchTerm} 
+              setSearchTerm={setSearchTerm}
+              sortedPlayers={sortPlayers(filteredPlayers.filter(p => shortlist.includes(p.id)))}
+              currentItems={sortPlayers(filteredPlayers.filter(p => shortlist.includes(p.id))).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
+              totalPages={Math.ceil(players.filter(p => shortlist.includes(p.id)).length / itemsPerPage)}
+              itemsPerPage={itemsPerPage}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              handleSort={handleSort}
+              columnOrder={columnOrder}
+              setColumnOrder={setColumnOrder}
+              columnWidths={columnWidths}
+              setColumnWidths={setColumnWidths}
+              isFilterCollapsed={true}
+              setIsFilterCollapsed={setIsFilterCollapsed}
+              contextMenu={contextMenu}
+              setContextMenu={setContextMenu}
+              filters={filters}
+              ALL_ATTRIBUTES={ALL_ATTRIBUTES}
+              title="YOUR SCOUTING SHORTLIST"
+              shortlist={shortlist}
+              toggleShortlist={toggleShortlist}
+            />
+          </MainLayout>
+        } />
+
+        {/* Compare View */}
+        <Route path="/compare" element={
+          <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView} currentView={view}>
+            <ComparePlayers 
+              players={players} 
+              compareSlots={compareSlots} 
+              removeFromCompare={removeFromCompare}
+              shortlist={shortlist}
+              toggleShortlist={toggleShortlist}
+              addToCompare={addToCompare}
             />
           </MainLayout>
         } />
 
         {/* Player Profile View */}
         <Route path="/player/:id" element={
-          <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView}>
-            <PlayerProfile players={players} />
+          <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView} currentView={view}>
+            <PlayerProfile 
+              players={players} 
+              compareSlots={compareSlots}
+              addToCompare={addToCompare}
+              removeFromCompare={removeFromCompare}
+              shortlist={shortlist}
+              toggleShortlist={toggleShortlist}
+            />
           </MainLayout>
         } />
       </Routes>

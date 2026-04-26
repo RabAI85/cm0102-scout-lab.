@@ -14,14 +14,27 @@ import {
 
 interface PlayerProfileProps {
   players: Player[];
+  compareSlots: { slot1: number | null, slot2: number | null };
+  addToCompare: (id: number, slot: 1 | 2) => void;
+  removeFromCompare: (slot: 1 | 2) => void;
+  shortlist: number[];
+  toggleShortlist: (id: number) => void;
 }
 
-export default function PlayerProfile({ players }: PlayerProfileProps) {
+export default function PlayerProfile({ 
+  players, 
+  compareSlots, 
+  addToCompare, 
+  removeFromCompare, 
+  shortlist, 
+  toggleShortlist 
+}: PlayerProfileProps) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isActionsOpen, setIsActionsOpen] = useState(false);
 
-  const player = players.find(p => p.id === parseInt(id || ''));
+  const playerId = parseInt(id || '');
+  const player = players.find(p => p.id === playerId);
 
   if (!player) {
     return (
@@ -35,47 +48,23 @@ export default function PlayerProfile({ players }: PlayerProfileProps) {
   }
 
   const getPositionAbbr = (pos: string) => {
-    const map: any = {
-      "Goalkeeper": "GK",
-      "Sweeper": "SW",
-      "Defender": "D",
-      "DefensiveMidfielder": "DM",
-      "Midfielder": "M",
-      "AttackingMidfielder": "AM",
-      "Attacker": "ST",
-      "WingBack": "WB"
-    };
-    let base = map[pos] || pos;
-    if (["GK", "SW", "ST"].includes(base)) return base;
-    
-    // Side logic
-    const sides = [
-      { key: "LeftSide", label: "L", val: player.positions["LeftSide"] },
-      { key: "RightSide", label: "R", val: player.positions["RightSide"] },
-      { key: "CentreSide", label: "C", val: player.positions["CentreSide"] },
-    ].sort((a,b) => (b.val as number) - (a.val as number));
-
-    if (sides[0].val > 10) {
-      return base + sides[0].label;
-    }
-    return base;
+    return pos; // The new parser already provides labels like GK, DR, MC etc.
   };
-
+ 
   const primaryPosition = Object.entries(player.positions)
-    .filter(([k, v]) => k !== "LeftSide" && k !== "RightSide" && k !== "CentreSide" && (v as number) >= 10)
     .sort((a, b) => (b[1] as number) - (a[1] as number))[0];
-
-  const headerPos = primaryPosition ? getPositionAbbr(primaryPosition[0]) : "";
-
+ 
+  const headerPos = primaryPosition ? primaryPosition[0] : "";
+ 
   const attr = player.attributes;
-
+ 
   const radarData = [
-    { subject: 'ATTACK', A: (attr['Finishing'] + attr['Dribbling'] + attr['OffTheBall'] + attr['LongShots']) / 4 },
-    { subject: 'VISION', A: (attr['Creativity'] + attr['Passing'] + attr['Decisions'] + attr['Anticipation']) / 4 },
-    { subject: 'PHYSICAL', A: (attr['Pace'] + attr['Acceleration'] + attr['Stamina'] + attr['Strength'] + attr['Jumping']) / 5 },
-    { subject: 'DEFENCE', A: (attr['Tackling'] + attr['Marking'] + attr['Positioning'] + attr['Heading']) / 4 },
-    { subject: 'MENTALITY', A: (attr['Bravery'] + attr['Determination'] + attr['WorkRate'] + attr['Teamwork']) / 4 },
-    { subject: 'PACE', A: (attr['Pace'] + attr['Acceleration'] + attr['Agility'] + attr['Balance']) / 4 },
+    { subject: 'ATTACK', A: ((attr['Finishing'] || 0) + (attr['Dribbling'] || 0) + (attr['OffTheBall'] || 0) + (attr['LongShots'] || 0)) / 4 },
+    { subject: 'VISION', A: ((attr['Creativity'] || 0) + (attr['Passing'] || 0) + (attr['Decisions'] || 0) + (attr['Anticipation'] || 0)) / 4 },
+    { subject: 'PHYSICAL', A: ((attr['Pace'] || 0) + (attr['Acceleration'] || 0) + (attr['Agility'] || 0) + (attr['Balance'] || 0) + (attr['Jumping'] || 0)) / 5 },
+    { subject: 'DEFENCE', A: ((attr['Tackling'] || 0) + (attr['Marking'] || 0) + (attr['Positioning'] || 0) + (attr['Heading'] || 0)) / 4 },
+    { subject: 'MENTALITY', A: ((attr['Bravery'] || 0) + (attr['Determination'] || 0) + (attr['WorkRate'] || 0) + (attr['Teamwork'] || 0)) / 4 },
+    { subject: 'PACE', A: ((attr['Pace'] || 0) + (attr['Acceleration'] || 0) + (attr['Agility'] || 0) + (attr['Balance'] || 0)) / 4 },
   ];
 
   const mainColumns = [
@@ -141,13 +130,30 @@ export default function PlayerProfile({ players }: PlayerProfileProps) {
                 </button>
                 
                 {isActionsOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-[#1C1B1B] border border-[#2A2A2A] rounded shadow-2xl z-50 overflow-hidden">
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-[#1C1B1B] border border-[#2A2A2A] rounded shadow-2xl z-50 overflow-hidden">
                     {[
-                      { label: 'ADD TO SHORTLIST', icon: UserPlus },
-                      { label: 'COMPARE', icon: LayoutGrid },
-                      { label: 'ADD TO XI', icon: Users }
+                      { 
+                        label: shortlist.includes(playerId) ? 'REMOVE FROM SHORTLIST' : 'ADD TO SHORTLIST', 
+                        icon: UserPlus,
+                        onClick: () => toggleShortlist(playerId)
+                      },
+                      { 
+                        label: compareSlots.slot1 === playerId ? 'REMOVE FROM SLOT 1' : 'ADD TO COMPARE SLOT 1', 
+                        icon: LayoutGrid,
+                        onClick: () => compareSlots.slot1 === playerId ? removeFromCompare(1) : addToCompare(playerId, 1)
+                      },
+                      { 
+                        label: compareSlots.slot2 === playerId ? 'REMOVE FROM SLOT 2' : 'ADD TO COMPARE SLOT 2', 
+                        icon: LayoutGrid,
+                        onClick: () => compareSlots.slot2 === playerId ? removeFromCompare(2) : addToCompare(playerId, 2)
+                      },
+                      { label: 'ADD TO XI', icon: Users, onClick: () => {} }
                     ].map((act, i) => (
-                      <button key={i} className="w-full px-4 py-2 text-left text-[10px] font-bold tracking-widest text-[#888888] hover:bg-[#E8F000] hover:text-black flex items-center gap-3 transition-colors">
+                      <button 
+                        key={i} 
+                        onClick={() => { act.onClick(); setIsActionsOpen(false); }}
+                        className="w-full px-4 py-2 text-left text-[10px] font-bold tracking-widest text-[#888888] hover:bg-[#E8F000] hover:text-black flex items-center gap-3 transition-colors"
+                      >
                         <act.icon size={12} />
                         {act.label}
                       </button>
@@ -157,7 +163,7 @@ export default function PlayerProfile({ players }: PlayerProfileProps) {
               </div>
             </div>
             <p className="text-[#888888] text-[11px] font-medium tracking-tight mt-1">
-              Born {player.dob.toLocaleDateString('de-DE')} (Age {player.age}) · {player.nationalityName} · 12 Caps
+              Born {player.dob?.toLocaleDateString('de-DE') || 'Unknown'} (Age {player.age}) · {player.nationalityName} · 12 Caps
             </p>
           </div>
         </div>
@@ -183,7 +189,7 @@ export default function PlayerProfile({ players }: PlayerProfileProps) {
                     <span className="text-[#888888] text-[13px] font-medium tracking-tight truncate pr-1">
                       {formatAttrName(attrName)}
                     </span>
-                    <span className={`font-sans text-[14px] font-bold ${getAttributeColor(attr[attrName] || 0)}`}>
+                    <span className={`font-outfit text-[14px] font-bold ${getAttributeColor(attr[attrName] || 0)}`}>
                       {attr[attrName] || '-'}
                     </span>
                   </div>
@@ -192,7 +198,7 @@ export default function PlayerProfile({ players }: PlayerProfileProps) {
                   <>
                     <div className={`h-[32px] px-3 flex justify-between items-center bg-[#202020]`}>
                       <span className="text-[#888888] text-[13px] font-medium tracking-tight">Preferred Foot</span>
-                      <span className="font-sans text-[14px] font-bold text-scout-yellow">{preferredFoot()}</span>
+                      <span className="font-outfit text-[14px] font-bold text-scout-yellow">{preferredFoot()}</span>
                     </div>
                     
                     {/* Inline Radar Chart - Proportional Size */}
@@ -243,7 +249,7 @@ export default function PlayerProfile({ players }: PlayerProfileProps) {
                           <span className="text-[#888888] text-[13px] font-medium tracking-tight truncate pr-1">
                             {formatAttrName(attrName)}
                           </span>
-                          <span className={`font-sans text-[14px] font-bold ${getAttributeColor(attr[attrName] || 0)}`}>
+                          <span className={`font-outfit text-[14px] font-bold ${getAttributeColor(attr[attrName] || 0)}`}>
                             {attr[attrName] || '-'}
                           </span>
                         </div>
@@ -279,15 +285,15 @@ export default function PlayerProfile({ players }: PlayerProfileProps) {
                     <tr key={i} className={`border-t border-[#2A2A2A] ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#202020]'}`}>
                       <td className="px-3 py-1.5 text-[#888888]">{h.season}</td>
                       <td className="px-3 py-1.5">{h.club}</td>
-                      <td className="px-3 py-1.5 text-center text-scout-yellow font-sans font-bold">{h.apps}</td>
-                      <td className="px-3 py-1.5 text-center text-scout-yellow font-sans font-bold">{h.gls}</td>
-                      <td className="px-3 py-1.5 text-center text-scout-yellow font-sans font-bold">{h.asts}</td>
-                      <td className="px-3 py-1.5 text-center text-scout-yellow font-sans font-bold">{h.mom}</td>
-                      <td className="px-3 py-1.5 text-center text-[#888888] font-sans">{h.passPct}</td>
-                      <td className="px-3 py-1.5 text-center text-[#888888] font-sans">{h.tck}</td>
-                      <td className="px-3 py-1.5 text-center text-[#888888] font-sans">{h.drb}</td>
-                      <td className="px-3 py-1.5 text-center text-[#888888] font-sans">{h.shTar}</td>
-                      <td className={`px-3 py-1.5 text-center font-bold font-sans ${parseFloat(h.avR) >= 7.5 ? 'text-scout-yellow' : 'text-[#888888]'}`}>{h.avR}</td>
+                      <td className="px-3 py-1.5 text-center text-scout-yellow font-outfit font-bold">{h.apps}</td>
+                      <td className="px-3 py-1.5 text-center text-scout-yellow font-outfit font-bold">{h.gls}</td>
+                      <td className="px-3 py-1.5 text-center text-scout-yellow font-outfit font-bold">{h.asts}</td>
+                      <td className="px-3 py-1.5 text-center text-scout-yellow font-outfit font-bold">{h.mom}</td>
+                      <td className="px-3 py-1.5 text-center text-[#888888] font-outfit">{h.passPct}</td>
+                      <td className="px-3 py-1.5 text-center text-[#888888] font-outfit">{h.tck}</td>
+                      <td className="px-3 py-1.5 text-center text-[#888888] font-outfit">{h.drb}</td>
+                      <td className="px-3 py-1.5 text-center text-[#888888] font-outfit">{h.shTar}</td>
+                      <td className={`px-3 py-1.5 text-center font-bold font-outfit ${parseFloat(h.avR) >= 7.5 ? 'text-scout-yellow' : 'text-[#888888]'}`}>{h.avR}</td>
                     </tr>
                   ))}
                   {(!player.history || player.history.length === 0) && (
@@ -323,12 +329,11 @@ export default function PlayerProfile({ players }: PlayerProfileProps) {
             <h3 className="text-[#888888] text-[11px] font-bold tracking-[0.2em] uppercase mb-[16px]">POSITIONS</h3>
             <div className="space-y-1">
                {Object.entries(player.positions)
-                .filter(([k, v]) => k !== "LeftSide" && k !== "RightSide" && k !== "CentreSide" && (v as number) >= 10)
                 .sort((a,b) => (b[1] as number) - (a[1] as number))
                 .map(([p, v]) => (
                   <div key={p} className="flex justify-between items-center h-[24px]">
-                    <span className="text-white text-[12px] font-bold tracking-widest uppercase">{getPositionAbbr(p)}</span>
-                    <span className="text-scout-yellow font-sans text-[13px] font-bold">{v as number}</span>
+                    <span className="text-white text-[12px] font-bold tracking-widest uppercase">{p}</span>
+                    <span className="text-scout-yellow font-outfit text-[13px] font-bold">{v as number}</span>
                   </div>
                 ))}
             </div>

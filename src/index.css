@@ -1,9 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&family=Overpass+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600&family=Overpass+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-bebas: "Bebas Neue", sans-serif;
+  --font-outfit: "Outfit", sans-serif;
   --font-mono: "Overpass Mono", ui-monospace, SFMono-Regular, monospace;
   --color-scout-yellow: #CDFF00;
 }
