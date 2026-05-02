@@ -31,11 +31,12 @@ export const getAttributeColor = (val: number) => {
 };
 
 export const ALL_ATTRIBUTES = [
-  'Acceleration', 'Aggression', 'Agility', 'Anticipation', 'Balance', 'Bravery', 'Consistency', 
-  'Corners', 'Crossing', 'Decisions', 'Dirtiness', 'Dribbling', 'Finishing', 'Flair', 'Handling', 
-  'Heading', 'ImportantMatches', 'InjuryProneness', 'Jumping', 'Influence', 'LeftFoot', 
-  'RightFoot', 'LongShots', 'Marking', 'NaturalFitness', 'OffTheBall', 'OneOnOnes', 
-  'Pace', 'Passing', 'Penalties', 'Positioning', 'Reflexes', 'Stamina', 'Strength', 'Tackling', 
-  'Teamwork', 'Technique', 'Versatility', 'Creativity', 'WorkRate', 'Adaptability', 'Ambition', 
-  'Determination', 'Loyalty', 'Pressure', 'Professionalism', 'Sportsmanship', 'Temperament'
+  'Acceleration', 'Aggression', 'Agility', 'Anticipation', 'Balance', 'Bravery', 'Consistency',
+  'Corners', 'Crossing', 'Decisions', 'Dirtiness', 'Dribbling', 'Finishing', 'Flair', 'Handling',
+  'Heading', 'ImportantMatches', 'InjuryProneness', 'Jumping', 'Influence', 'LeftFoot',
+  'RightFoot', 'LongShots', 'Marking', 'NaturalFitness', 'OffTheBall', 'OneOnOnes',
+  'Pace', 'Passing', 'Penalties', 'Positioning', 'Reflexes', 'SetPieces', 'Stamina', 'Strength',
+  'Tackling', 'Teamwork', 'Technique', 'ThrowIns', 'Versatility', 'Creativity', 'WorkRate',
+  'Adaptability', 'Ambition', 'Determination', 'Loyalty', 'Pressure', 'Professionalism',
+  'Sportsmanship', 'Temperament'
 ];
