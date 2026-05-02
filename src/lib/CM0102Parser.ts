@@ -252,9 +252,14 @@ export class CM0102Parser {
       );
     }
 
-    this.readInt32(); // skip 4 bytes (padding)
-
-    const numBlocks = this.readInt32();
+    // CM0102 save format: [type:4][numBlocks:4][blockTable...]
+    // Some tools document a 4-byte padding here — we try without it first,
+    // then fall back to with-padding if numBlocks looks unreasonable.
+    let numBlocks = this.readInt32(); // try bytes 4-7
+    if (numBlocks < 1 || numBlocks > 200) {
+      this.seek(8);
+      numBlocks = this.readInt32();   // try bytes 8-11 (with 4-byte padding)
+    }
     this.log(`Found ${numBlocks} blocks in save file.`, 'info');
 
     for (let i = 0; i < numBlocks; i++) {
