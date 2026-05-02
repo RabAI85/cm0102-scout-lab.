@@ -243,6 +243,40 @@ export class CM0102Parser {
 
   // ── Block directory ───────────────────────────────────────────
 
+  // Try one candidate block-table format. Returns true if it produced at least
+  // one block name containing ".dat" with a position/size within the file.
+  private tryReadBlockTable(
+    tableOffset: number,
+    numBlocks: number,
+    nameFirst: boolean
+  ): boolean {
+    const fileSize = this.buffer.byteLength;
+    this.blocks.clear();
+    this.seek(tableOffset);
+
+    for (let i = 0; i < numBlocks; i++) {
+      let name: string, position: number, size: number;
+      if (nameFirst) {
+        name     = this.readString(260);
+        position = this.readInt32();
+        size     = this.readInt32();
+      } else {
+        position = this.readInt32();
+        size     = this.readInt32();
+        name     = this.readString(260);
+      }
+      this.blocks.set(name.toLowerCase().trim(), { position, size });
+    }
+
+    return Array.from(this.blocks.entries()).some(([name, block]) =>
+      name.includes('.dat') &&
+      block.position > 0 &&
+      block.position < fileSize &&
+      block.size > 0 &&
+      block.size < fileSize
+    );
+  }
+
   public parseHeader(): void {
     this.seek(0);
     const compressionFlag = this.readInt32();
@@ -252,16 +286,36 @@ export class CM0102Parser {
       );
     }
 
-    this.readInt32(); // skip 4 bytes (padding)
+    // Probe numBlocks at two candidate offsets (4 = no padding, 8 = 4-byte padding).
+    const candidates: Array<{ numBlocksOffset: number; nameFirst: boolean }> = [
+      { numBlocksOffset: 4, nameFirst: true  },  // name-first, no padding
+      { numBlocksOffset: 4, nameFirst: false },  // pos-first,  no padding
+      { numBlocksOffset: 8, nameFirst: true  },  // name-first, 4-byte padding
+      { numBlocksOffset: 8, nameFirst: false },  // pos-first,  4-byte padding
+    ];
 
-    const numBlocks = this.readInt32();
-    this.log(`Found ${numBlocks} blocks in save file.`, 'info');
+    let detected = false;
+    for (const { numBlocksOffset, nameFirst } of candidates) {
+      this.seek(numBlocksOffset);
+      const numBlocks = this.readInt32();
+      if (numBlocks < 1 || numBlocks > 200) continue;
 
-    for (let i = 0; i < numBlocks; i++) {
-      const position = this.readInt32();
-      const size = this.readInt32();
-      const name = this.readString(260);
-      this.blocks.set(name.toLowerCase().trim(), { position, size });
+      const tableOffset = numBlocksOffset + 4;
+      if (this.tryReadBlockTable(tableOffset, numBlocks, nameFirst)) {
+        this.log(
+          `Found ${numBlocks} blocks (format: numBlocks@${numBlocksOffset}, ${nameFirst ? 'name-first' : 'pos-first'}).`,
+          'info'
+        );
+        detected = true;
+        break;
+      }
+    }
+
+    if (!detected) {
+      throw new Error(
+        'Could not detect save file block table format. ' +
+        'Make sure this is an uncompressed CM 01/02 save file (.sav).'
+      );
     }
 
     this.log(`Block directory loaded. Blocks: ${Array.from(this.blocks.keys()).join(', ')}`, 'info');
