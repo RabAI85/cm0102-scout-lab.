@@ -1,8 +1,8 @@
 // ============================================================
 // CM0102Parser.ts
 // Ported from CMScoutIntrinsic C# Source (DataService.cs)
-// Displays raw intrinsic attribute values (1-20), matching
-// CM Scout 2.00 / CM0102 default scouting view.
+// CA18 attributes use InMatchNormalized (the app's default view).
+// Non-CA18 attributes show raw intrinsic values (1-20).
 // ============================================================
 
 export interface Player {
@@ -25,8 +25,6 @@ export interface Player {
     current: number;
     world: number;
   };
-  /** Raw intrinsic attribute values (1-20), as stored in the save file.
-   *  These match what CM Scout 2.00 and the in-game scout report show. */
   attributes: Record<string, number>;
   positions: Record<string, number>;
   preferredFoot: string;
@@ -66,16 +64,13 @@ export interface Club {
   attendance: number;
 }
 
-// ── Attribute metadata (for colour coding / filter UI) ──────────────
+// ── Attribute metadata ──────────────────────────────────────────
 export interface AttrDef {
-  /** If true, the raw file value is on the CA/18 hidden scale. */
   isCA18: boolean;
-  /** If true, a LOWER value is better (InjuryProneness, Dirtiness). */
   isLessBetter: boolean;
 }
 
 export const ATTR_DEFS: Record<string, AttrDef> = {
-  // CA18 — tactical / technical
   'Anticipation':    { isCA18: true,  isLessBetter: false },
   'Creativity':      { isCA18: true,  isLessBetter: false },
   'Crossing':        { isCA18: true,  isLessBetter: false },
@@ -91,11 +86,9 @@ export const ATTR_DEFS: Record<string, AttrDef> = {
   'Positioning':     { isCA18: true,  isLessBetter: false },
   'Tackling':        { isCA18: true,  isLessBetter: false },
   'ThrowIns':        { isCA18: true,  isLessBetter: false },
-  // CA18 — GK-specific
   'Handling':        { isCA18: true,  isLessBetter: false },
   'OneOnOnes':       { isCA18: true,  isLessBetter: false },
   'Reflexes':        { isCA18: true,  isLessBetter: false },
-  // Physical (non-CA18)
   'Acceleration':    { isCA18: false, isLessBetter: false },
   'Agility':         { isCA18: false, isLessBetter: false },
   'Balance':         { isCA18: false, isLessBetter: false },
@@ -104,7 +97,6 @@ export const ATTR_DEFS: Record<string, AttrDef> = {
   'Pace':            { isCA18: false, isLessBetter: false },
   'Stamina':         { isCA18: false, isLessBetter: false },
   'Strength':        { isCA18: false, isLessBetter: false },
-  // Mental / technical (non-CA18)
   'Aggression':      { isCA18: false, isLessBetter: false },
   'Bravery':         { isCA18: false, isLessBetter: false },
   'Consistency':     { isCA18: false, isLessBetter: false },
@@ -121,7 +113,6 @@ export const ATTR_DEFS: Record<string, AttrDef> = {
   'Technique':       { isCA18: false, isLessBetter: false },
   'Versatility':     { isCA18: false, isLessBetter: false },
   'WorkRate':        { isCA18: false, isLessBetter: false },
-  // Staff mentals
   'Adaptability':    { isCA18: false, isLessBetter: false },
   'Ambition':        { isCA18: false, isLessBetter: false },
   'Determination':   { isCA18: false, isLessBetter: false },
@@ -131,6 +122,29 @@ export const ATTR_DEFS: Record<string, AttrDef> = {
   'Sportsmanship':   { isCA18: false, isLessBetter: false },
   'Temperament':     { isCA18: false, isLessBetter: false },
 };
+
+// CA18 attributes in the same order as DataService.Attributes[].
+// gkOnly = true means the normalization range is built only from GK players.
+const CA18_ATTRS: { name: string; gkOnly: boolean }[] = [
+  { name: 'Anticipation', gkOnly: false },
+  { name: 'Creativity',   gkOnly: false },
+  { name: 'Crossing',     gkOnly: false },
+  { name: 'Decisions',    gkOnly: false },
+  { name: 'Dribbling',    gkOnly: false },
+  { name: 'Finishing',    gkOnly: false },
+  { name: 'Heading',      gkOnly: false },
+  { name: 'LongShots',    gkOnly: false },
+  { name: 'Marking',      gkOnly: false },
+  { name: 'OffTheBall',   gkOnly: false },
+  { name: 'Passing',      gkOnly: false },
+  { name: 'Penalties',    gkOnly: false },
+  { name: 'Positioning',  gkOnly: false },
+  { name: 'Tackling',     gkOnly: false },
+  { name: 'ThrowIns',     gkOnly: false },
+  { name: 'Handling',     gkOnly: true  },
+  { name: 'OneOnOnes',    gkOnly: true  },
+  { name: 'Reflexes',     gkOnly: true  },
+];
 
 // ── Compression-Aware Binary Reader ───────────────────────────
 
@@ -205,15 +219,17 @@ class CMBinaryReader {
   }
 }
 
-// ── Display helper ───────────────────────────────────────────────
-//
-// Show the raw intrinsic value clamped to 1-20.
-// This matches what CM Scout 2.00 and the in-game scouting report
-// display. CA18 attributes are stored in the same 1-20 range inside
-// the save file; the highConvert/lowConvert formulas are only used by
-// the match engine internally during simulation.
-function clamp120(v: number): number {
-  return Math.max(1, Math.min(20, Math.abs(v)));
+// ── InMatchNormalized helpers (mirrors DataService.cs logic) ────
+
+function getInMatch(intrinsic: number, ca: number): number {
+  const r = intrinsic / 5.0 + ca / 20.0 + 10;
+  return Math.trunc(Math.max(0, r));
+}
+
+function normalizeInMatch(inMatch: number, min: number, max: number): number {
+  if (max <= min) return 10;
+  const r = 20.0 * (inMatch - min) / (max - min) + 0.5;
+  return Math.max(1, Math.min(20, Math.trunc(r)));
 }
 
 // ── Parser Main Class ──────────────────────────────────────────
@@ -253,7 +269,6 @@ export class CM0102Parser {
     this.isCompressed = hv.getInt32(0, true) === 4;
     const numBlocks   = hv.getInt32(8, true);
 
-    // Block directory is always uncompressed
     for (let i = 0; i < numBlocks; i++) {
       const pos  = hv.getInt32(12 + i * 268, true);
       const size = hv.getInt32(16 + i * 268, true);
@@ -267,7 +282,6 @@ export class CM0102Parser {
 
     const r = new CMBinaryReader(this.buffer, this.isCompressed);
 
-    // 1. Game date (general.dat — offset 3944 from block start)
     const genBlock = this.blocks.get('general.dat');
     if (genBlock) {
       r.seek(genBlock.position);
@@ -276,18 +290,38 @@ export class CM0102Parser {
       this.log(`Game date: ${this.gameDate?.toDateString()}`, 'success');
     }
 
-    // 2. Reference tables
     const nationsMap   = this.loadNations(r);
     const divisionsMap = this.loadDivisions(r);
     const clubsMap     = this.loadClubs(r, nationsMap, divisionsMap);
     const firstNames   = this.loadNames(r, 'first_names.dat');
     const secondNames  = this.loadNames(r, 'second_names.dat');
     const commonNames  = this.loadNames(r, 'common_names.dat');
-
-    // 3. Raw player bodies
     const rawPlayerMap = this.loadRawPlayers(r);
 
-    // 4. Staff records → Player list
+    // ── Pass 1: compute inMatch min/max for each CA18 attribute ──
+    // Mirrors C# first pass in DataService.cs.
+    // For GK-specific attrs (Handling/OneOnOnes/Reflexes), only GK
+    // players contribute to the normalization range.
+    const inMatchRanges = new Map<string, { min: number; max: number }>();
+    for (const { name } of CA18_ATTRS) {
+      inMatchRanges.set(name, { min: 127, max: -128 });
+    }
+
+    for (const rp of rawPlayerMap.values()) {
+      if (rp.ca <= 0) continue; // skip placeholder entries
+      const isGK = rp.gk > 14;
+      for (const { name, gkOnly } of CA18_ATTRS) {
+        if (gkOnly && !isGK) continue;
+        const intrinsic = rp.namedAttrs[name] ?? 0;
+        const im = getInMatch(intrinsic, rp.ca);
+        const rng = inMatchRanges.get(name)!;
+        if (im < rng.min) rng.min = im;
+        if (im > rng.max) rng.max = im;
+      }
+    }
+    this.log('CA18 ranges computed.', 'info');
+
+    // ── Pass 2: build player objects ──────────────────────────────
     const finalists: Player[] = [];
     const staffList: Staff[]  = [];
     const positionCounts = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
@@ -300,22 +334,21 @@ export class CM0102Parser {
       for (let i = 0; i < count; i++) {
         r.seek(staffBlock.position + i * 110);
 
-        const id        = r.readInt32();      // 4
-        const fNameId   = r.readInt32();      // 4
-        const sNameId   = r.readInt32();      // 4
-        const cNameId   = r.readInt32();      // 4
-        const dob       = this.readCMDate(r); // 8
-        r.readInt16();                         // 2  YearOfBirth
-        const fNationId = r.readInt32();      // 4
-        const sNationId = r.readInt32();      // 4
-        // IntApps(1) + IntGoals(1) + NationalJobId(4) + JobForNation(1)
-        // + DateJoinedNation(8) + DateExpiresNation(8) = 23
+        const id        = r.readInt32();
+        const fNameId   = r.readInt32();
+        const sNameId   = r.readInt32();
+        const cNameId   = r.readInt32();
+        const dob       = this.readCMDate(r);
+        r.readInt16();                         // YearOfBirth
+        const fNationId = r.readInt32();
+        const sNationId = r.readInt32();
+        // IntApps(1)+IntGoals(1)+NationalJobId(4)+JobForNation(1)+DateJoinedNation(8)+DateExpiresNation(8) = 23
         r.skip(23);
-        const clubJobId = r.readInt32();      // 4
-        // JobForClub(1) + DateJoinedClub(8) + DateExpiresClub(8) = 17
+        const clubJobId = r.readInt32();
+        // JobForClub(1)+DateJoinedClub(8)+DateExpiresClub(8) = 17
         r.skip(17);
-        const wage  = r.readInt32();          // 4
-        const value = r.readInt32();          // 4
+        const wage  = r.readInt32();
+        const value = r.readInt32();
 
         const adapt = r.readSByte();
         const amb   = r.readSByte();
@@ -342,23 +375,31 @@ export class CM0102Parser {
           const rp = rawPlayerMap.get(playerId);
           if (rp) {
             const isGK = rp.gk > 14;
-
-            // Display raw intrinsic values (1-20) — matches CM Scout 2.00 view
             const attrs: Record<string, number> = {};
-            for (const [k, v] of Object.entries(rp.namedAttrs) as [string, number][]) {
-              attrs[k] = clamp120(v);
-            }
-            // Staff mentals (already 1-20 in file, stored as abs)
-            attrs['Adaptability']    = Math.abs(adapt);
-            attrs['Ambition']        = Math.abs(amb);
-            attrs['Determination']   = Math.abs(det);
-            attrs['Loyalty']         = Math.abs(loy);
-            attrs['Pressure']        = Math.abs(pre);
-            attrs['Professionalism'] = Math.abs(pro);
-            attrs['Sportsmanship']   = Math.abs(spo);
-            attrs['Temperament']     = Math.abs(tem);
 
-            // Positions
+            for (const [k, v] of Object.entries(rp.namedAttrs) as [string, number][]) {
+              const def = ATTR_DEFS[k];
+              if (def?.isCA18) {
+                // InMatchNormalized — mirrors CMScoutIntrinsic default mode
+                const im  = getInMatch(v, rp.ca);
+                const rng = inMatchRanges.get(k)!;
+                attrs[k] = normalizeInMatch(im, rng.min, rng.max);
+              } else {
+                // Non-CA18: raw value clamped 1-20
+                attrs[k] = Math.max(1, Math.min(20, v < 0 ? 1 : v));
+              }
+            }
+
+            // Staff mentals from staff.dat (1-20, no conversion needed)
+            attrs['Adaptability']    = Math.max(1, Math.min(20, Math.abs(adapt)));
+            attrs['Ambition']        = Math.max(1, Math.min(20, Math.abs(amb)));
+            attrs['Determination']   = Math.max(1, Math.min(20, Math.abs(det)));
+            attrs['Loyalty']         = Math.max(1, Math.min(20, Math.abs(loy)));
+            attrs['Pressure']        = Math.max(1, Math.min(20, Math.abs(pre)));
+            attrs['Professionalism'] = Math.max(1, Math.min(20, Math.abs(pro)));
+            attrs['Sportsmanship']   = Math.max(1, Math.min(20, Math.abs(spo)));
+            attrs['Temperament']     = Math.max(1, Math.min(20, Math.abs(tem)));
+
             const pos: Record<string, number> = {};
             if (isGK)       { pos['GK'] = 20; positionCounts.GK++;  }
             if (rp.sw > 14) pos['SW'] = 20;
@@ -375,12 +416,11 @@ export class CM0102Parser {
               else if (rp.at > 14)                             positionCounts.FWD++;
             }
 
-            // Preferred foot from foot-skill attribute bytes (not position side bytes)
-            const lf = clamp120(rp.namedAttrs['LeftFoot']  || 0);
-            const rf = clamp120(rp.namedAttrs['RightFoot'] || 0);
+            const lf = attrs['LeftFoot']  || 1;
+            const rf = attrs['RightFoot'] || 1;
 
             finalists.push({
-              id: id,
+              id,
               firstName: fName, lastName: sName, commonName: cName,
               age, dob,
               nationalityName:       nationsMap.get(fNationId) || 'Unknown',
@@ -403,14 +443,14 @@ export class CM0102Parser {
             nationality: nationsMap.get(fNationId) || 'Unknown',
             clubName:    club?.name || 'Unemployed',
             job: 'Staff', wage, value,
-            adaptability:    Math.abs(adapt),
-            ambition:        Math.abs(amb),
-            determination:   Math.abs(det),
-            loyalty:         Math.abs(loy),
-            pressure:        Math.abs(pre),
-            professionalism: Math.abs(pro),
-            sportsmanship:   Math.abs(spo),
-            temperament:     Math.abs(tem),
+            adaptability:    Math.max(1, Math.min(20, Math.abs(adapt))),
+            ambition:        Math.max(1, Math.min(20, Math.abs(amb))),
+            determination:   Math.max(1, Math.min(20, Math.abs(det))),
+            loyalty:         Math.max(1, Math.min(20, Math.abs(loy))),
+            pressure:        Math.max(1, Math.min(20, Math.abs(pre))),
+            professionalism: Math.max(1, Math.min(20, Math.abs(pro))),
+            sportsmanship:   Math.max(1, Math.min(20, Math.abs(spo))),
+            temperament:     Math.max(1, Math.min(20, Math.abs(tem))),
             playerId: -1,
           });
         }
@@ -427,7 +467,6 @@ export class CM0102Parser {
     const block = this.blocks.get(file);
     const map   = new Map<number, string>();
     if (!block) return map;
-    // CMName: Name(51) + Id(4) + NationId(4) + Count(1) = 60
     const count = Math.floor(block.size / 60);
     for (let i = 0; i < count; i++) {
       r.seek(block.position + i * 60);
@@ -442,7 +481,6 @@ export class CM0102Parser {
     const block = this.blocks.get('nation.dat');
     const map   = new Map<number, string>();
     if (!block) return map;
-    // CMNation = 290 bytes
     const count = Math.floor(block.size / 290);
     for (let i = 0; i < count; i++) {
       r.seek(block.position + i * 290);
@@ -457,7 +495,6 @@ export class CM0102Parser {
     const block = this.blocks.get('club_comp.dat');
     const map   = new Map<number, string>();
     if (!block) return map;
-    // CMDivision = 107 bytes: Id(4) + Name(51) + …
     const count = Math.floor(block.size / 107);
     for (let i = 0; i < count; i++) {
       r.seek(block.position + i * 107);
@@ -476,29 +513,22 @@ export class CM0102Parser {
     const block = this.blocks.get('club.dat');
     const map   = new Map<number, Club>();
     if (!block) return map;
-    // CMClub = 581 bytes
     const count = Math.floor(block.size / 581);
     for (let i = 0; i < count; i++) {
       r.seek(block.position + i * 581);
       const id         = r.readInt32();
       const name       = r.readString(51);
-      r.skip(1);              // GenderName
-      r.readString(26);       // ShortName
-      r.skip(1);              // GenderShortName
+      r.skip(1);
+      r.readString(26);
+      r.skip(1);
       const nationId   = r.readInt32();
       const divisionId = r.readInt32();
-      r.skip(4);              // LastDivisionId
-      r.skip(1);              // LastPosition
-      r.skip(4);              // ReserveDivisionId
-      r.skip(1);              // ProfessionalStatus
+      r.skip(4); r.skip(1); r.skip(4); r.skip(1);
       const cash       = r.readInt32();
       const stadiumId  = r.readInt32();
-      r.skip(1);              // OwnStadium
-      r.skip(4);              // ReserveStadiumId
-      r.skip(1);              // MatchDay
+      r.skip(1); r.skip(4); r.skip(1);
       const attendance = r.readInt32();
-      r.skip(4);              // MinAttendance
-      r.skip(4);              // MaxAttendance
+      r.skip(4); r.skip(4);
       const training   = r.readSByte();
       const rep        = r.readInt16();
       map.set(id, {
@@ -518,37 +548,25 @@ export class CM0102Parser {
     const block = this.blocks.get('player.dat');
     const map   = new Map<number, any>();
     if (!block) return map;
-    // CMPlayer = 70 bytes (verified against C# struct)
     const count = Math.floor(block.size / 70);
     for (let i = 0; i < count; i++) {
       r.seek(block.position + i * 70);
 
-      const id   = r.readInt32(); // 4
+      const id   = r.readInt32();
       r.skip(1);                  // SquadNumber
-      const ca   = r.readInt16(); // 2
-      const pa   = r.readInt16(); // 2
-      const hRep = r.readInt16(); // 2
-      const cRep = r.readInt16(); // 2
-      const wRep = r.readInt16(); // 2  → 15 bytes
+      const ca   = r.readInt16();
+      const pa   = r.readInt16();
+      const hRep = r.readInt16();
+      const cRep = r.readInt16();
+      const wRep = r.readInt16(); // 15 bytes total
 
-      // 12 position bytes
-      const gk = r.readSByte(); // Goalkeeper
-      const sw = r.readSByte(); // Sweeper
-      const d  = r.readSByte(); // Defender
-      const dm = r.readSByte(); // DefensiveMidfielder
-      const m  = r.readSByte(); // Midfielder
-      const am = r.readSByte(); // AttackingMidfielder
-      const at = r.readSByte(); // Attacker
-      const wb = r.readSByte(); // WingBack
-      r.skip(1);                // RightSide
-      r.skip(1);                // LeftSide
-      r.skip(1);                // CentreSide
-      r.skip(1);                // FreeRole  → 27 bytes total
+      const gk = r.readSByte(); const sw = r.readSByte();
+      const d  = r.readSByte(); const dm = r.readSByte();
+      const m  = r.readSByte(); const am = r.readSByte();
+      const at = r.readSByte(); const wb = r.readSByte();
+      r.skip(1); r.skip(1); r.skip(1); r.skip(1); // RightSide/LeftSide/CentreSide/FreeRole
 
-      // 43 attribute bytes in exact C# CMPlayer struct order
-      // NOTE: These are raw intrinsic values (1-20 scale in file).
-      //       The game engine uses highConvert/lowConvert internally
-      //       during match simulation, but scouting views show raw.
+      // 43 attribute bytes — exact C# CMPlayer struct order
       const namedAttrs: Record<string, number> = {
         Acceleration:    r.readSByte(),
         Aggression:      r.readSByte(),
@@ -593,13 +611,9 @@ export class CM0102Parser {
         Creativity:      r.readSByte(),
         WorkRate:        r.readSByte(),
       };
-      r.readSByte(); // Morale (last byte, not exposed)
+      r.readSByte(); // Morale
 
-      map.set(id, {
-        id, ca, pa, hRep, cRep, wRep,
-        gk, sw, d, dm, m, am, at, wb,
-        namedAttrs,
-      });
+      map.set(id, { id, ca, pa, hRep, cRep, wRep, gk, sw, d, dm, m, am, at, wb, namedAttrs });
     }
     return map;
   }
