@@ -1,10 +1,9 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { 
   Database, 
@@ -50,7 +49,7 @@ function MainLayout({
 
   return (
     <div className="bg-[#0E0E0E] text-[#E0E0E0] h-screen w-screen flex font-sans overflow-hidden">
-      {/* 1. Narrow Left Nav */}
+      {/* Left Nav */}
       <nav className={`${isNavCollapsed ? 'w-[64px]' : 'w-[100px]'} bg-[#0E0E0E] flex flex-col items-center py-6 shrink-0 border-r border-[#1C1B1B] transition-all duration-300 relative group`}>
         <button 
           onClick={() => setIsNavCollapsed(!isNavCollapsed)}
@@ -66,11 +65,11 @@ function MainLayout({
         
         <div className="flex flex-col gap-6 w-full items-center">
           {[
-            { icon: Search, label: 'DATABASE', id: 'scout-lab', path: '/scout-lab' },
-            { icon: Bookmark, label: 'SHORTLIST', id: 'shortlist', path: '/shortlist' },
-            { icon: GitCompare, label: 'COMPARE', id: 'compare', path: '/compare' },
-            { icon: Briefcase, label: 'STAFF', id: 'staff', path: '#' },
-            { icon: Building2, label: 'CLUB', id: 'club', path: '#' }
+            { icon: Search,     label: 'DATABASE', id: 'scout-lab', path: '/scout-lab' },
+            { icon: Bookmark,   label: 'SHORTLIST', id: 'shortlist', path: '/shortlist' },
+            { icon: GitCompare, label: 'COMPARE',  id: 'compare',   path: '/compare' },
+            { icon: Briefcase,  label: 'STAFF',    id: 'staff',     path: '#' },
+            { icon: Building2,  label: 'CLUB',     id: 'club',      path: '#' }
           ].map((item, i) => (
             <div 
               key={i} 
@@ -144,7 +143,6 @@ export default function App() {
     );
   };
   
-  // Shared Scouting States
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | null>('currentAbility');
@@ -153,15 +151,23 @@ export default function App() {
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
   const [columnOrder, setColumnOrder] = useState<string[]>([
-    'save', 'name', 'flag', 'pos', 'age', 'clubName', 'value', 'wage', 'currentAbility', 'potentialAbility', 'injuryProne', 'impMatches', 'consistency'
+    'save', 'name', 'flag', 'pos', 'age', 'clubName', 'value', 'wage',
+    'currentAbility', 'potentialAbility', 'injuryProne', 'impMatches', 'consistency'
   ]);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-    save: 40, name: 240, flag: 40, pos: 70, age: 55, clubName: 160, value: 100, wage: 100, currentAbility: 55, potentialAbility: 55, injuryProne: 55, impMatches: 55, consistency: 55,
+    save: 40, name: 240, flag: 40, pos: 70, age: 55, clubName: 160,
+    value: 100, wage: 100, currentAbility: 55, potentialAbility: 55,
+    injuryProne: 55, impMatches: 55, consistency: 55,
   });
   const [filters, setFilters] = useState({
     categories: [] as string[],
     sides: [] as string[],
-    minAge: 15, maxAge: 45, minCA: 0, maxCA: 200, minPA: 0, maxPA: 200, minValue: 0, maxValue: 50000000, minConsistency: 0, minImportantMatches: 0, minNaturalFitness: 0, maxInjuryProneness: 20,
+    minAge: 15, maxAge: 45,
+    minCA: 0, maxCA: 200,
+    minPA: 0, maxPA: 200,
+    minValue: 0, maxValue: 50000000,
+    minConsistency: 0, minImportantMatches: 0,
+    minNaturalFitness: 0, maxInjuryProneness: 20,
     attributes: {} as Record<string, number>,
     enabledAttributes: [] as string[]
   });
@@ -172,7 +178,8 @@ export default function App() {
 
   const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     setLogs(prev => [...prev.slice(-100), {
-      message, type, timestamp: new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      message, type,
+      timestamp: new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
     }]);
   };
 
@@ -216,16 +223,16 @@ export default function App() {
         positions: positionCounts
       });
       
-      addLog(`Ready. Table view populated with ${parsedPlayers.length} players. ${parsedStaff.length} staff and ${parsedClubs.length} clubs loaded.`, 'success');
+      addLog(`Ready. ${parsedPlayers.length} players, ${parsedStaff.length} staff, ${parsedClubs.length} clubs loaded.`, 'success');
       if (parsedPlayers.length > 0) {
         const sample = parsedPlayers[0];
-        addLog(`Sample player: ${sample.firstName} ${sample.lastName}, Age: ${sample.age}, Club: ${sample.clubName}`, 'info');
+        addLog(`Sample: ${sample.firstName} ${sample.lastName}, Age: ${sample.age}, Club: ${sample.clubName}`, 'info');
         setView('scout-lab');
       }
       setIsParsing(false);
     } catch (error) {
       clearInterval(progressInterval);
-      addLog(error instanceof Error ? error.message : "Unknown error occurred during parsing", 'error');
+      addLog(error instanceof Error ? error.message : 'Unknown error during parsing', 'error');
       setIsParsing(false);
     }
   };
@@ -255,23 +262,20 @@ export default function App() {
   };
 
   const filteredPlayers = players.filter(p => {
-    // 1. Search
     const searchString = `${p.firstName} ${p.lastName} ${p.commonName} ${p.clubName} ${p.nationalityName}`.toLowerCase();
     if (searchTerm && !searchString.includes(searchTerm.toLowerCase())) return false;
 
-    // 2. Position Filter
     const matchesPosition = filters.categories.length === 0 || filters.categories.some((cat: string) => {
       const posKeys = Object.keys(p.positions);
       let matchesCategory = false;
       
-      if (cat === 'GK') matchesCategory = posKeys.includes('GK');
-      if (cat === 'DEF') matchesCategory = posKeys.some(k => k === 'SW' || k.startsWith('D') || k.startsWith('WB'));
-      if (cat === 'MID') matchesCategory = posKeys.some(k => k.startsWith('DM') || k.startsWith('M') || k.startsWith('AM'));
-      if (cat === 'ATT') matchesCategory = posKeys.some(k => k.startsWith('ST'));
+      if (cat === 'GK')  matchesCategory = posKeys.includes('GK');
+      // Exact key matching — 'DM' is MID not DEF; parser emits 'AT' for Attacker
+      if (cat === 'DEF') matchesCategory = posKeys.some(k => k === 'SW' || k === 'D' || k === 'WB');
+      if (cat === 'MID') matchesCategory = posKeys.some(k => k === 'DM' || k === 'M' || k === 'AM');
+      if (cat === 'ATT') matchesCategory = posKeys.some(k => k === 'AT');
 
       if (!matchesCategory) return false;
-      
-      // If we matched the category, check sides if any sides are selected
       if (cat === 'GK' || filters.sides.length === 0) return true;
       
       const sideMap: any = { 'Left': 'L', 'Right': 'R', 'Centre': 'C' };
@@ -282,13 +286,11 @@ export default function App() {
     });
     if (!matchesPosition) return false;
 
-    // 3. Range Filters
     if (p.age > 0 && (p.age < filters.minAge || p.age > filters.maxAge)) return false;
     if (p.currentAbility < filters.minCA || p.currentAbility > filters.maxCA) return false;
     if (p.potentialAbility < filters.minPA || p.potentialAbility > filters.maxPA) return false;
     if (p.value > 0 && (p.value < filters.minValue || p.value > filters.maxValue)) return false;
 
-    // 4. Enabled Attribute Filters
     for (const attr of filters.enabledAttributes) {
       if ((p.attributes[attr] || 0) < (filters.attributes[attr] || 0)) return false;
     }
@@ -327,7 +329,13 @@ export default function App() {
 
   const clearFilters = () => {
     setFilters({
-      categories: [], sides: [], minAge: 15, maxAge: 45, minCA: 0, maxCA: 200, minPA: 0, maxPA: 200, minValue: 0, maxValue: 50000000, minConsistency: 0, minImportantMatches: 0, minNaturalFitness: 0, maxInjuryProneness: 20,
+      categories: [], sides: [],
+      minAge: 15, maxAge: 45,
+      minCA: 0, maxCA: 200,
+      minPA: 0, maxPA: 200,
+      minValue: 0, maxValue: 50000000,
+      minConsistency: 0, minImportantMatches: 0,
+      minNaturalFitness: 0, maxInjuryProneness: 20,
       attributes: {},
       enabledAttributes: []
     });
@@ -337,7 +345,6 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Import View */}
         <Route path="/" element={
           players.length === 0 || view === 'import' ? (
             <ImportView 
@@ -350,7 +357,6 @@ export default function App() {
           )
         } />
 
-        {/* Database View */}
         <Route path="/scout-lab" element={
           <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView} currentView={view}>
             <aside className={`${isFilterCollapsed ? 'w-0 opacity-0 px-0' : 'w-[280px] opacity-100'} bg-[#0E0E0E] flex flex-col shrink-0 border-r border-[#1C1B1B] transition-all duration-300 relative group/sidebar`}>
@@ -386,9 +392,7 @@ export default function App() {
                           </span>
                         </div>
                         <input 
-                          type="range"
-                          min="0"
-                          max="20"
+                          type="range" min="0" max="20"
                           disabled={!filters.enabledAttributes.includes(attr)}
                           value={filters.attributes[attr] || 0}
                           onChange={(e) => setFilters(f => ({
@@ -432,10 +436,9 @@ export default function App() {
           </MainLayout>
         } />
 
-        {/* Shortlist View */}
         <Route path="/shortlist" element={
           <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView} currentView={view}>
-             <ScoutLab 
+            <ScoutLab 
               players={players.filter(p => shortlist.includes(p.id))} 
               searchTerm={searchTerm} 
               setSearchTerm={setSearchTerm}
@@ -465,7 +468,6 @@ export default function App() {
           </MainLayout>
         } />
 
-        {/* Compare View */}
         <Route path="/compare" element={
           <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView} currentView={view}>
             <ComparePlayers 
@@ -479,7 +481,6 @@ export default function App() {
           </MainLayout>
         } />
 
-        {/* Player Profile View */}
         <Route path="/player/:id" element={
           <MainLayout isNavCollapsed={isNavCollapsed} setIsNavCollapsed={setIsNavCollapsed} setView={setView} currentView={view}>
             <PlayerProfile 
