@@ -67,17 +67,18 @@ export default function ScoutLab({
 }: ScoutLabProps) {
   const navigate = useNavigate();
 
+  // Whether the primary position display should be highlighted given active filters
   const isPosActive = (pos: string) => filters.categories.length === 0 || filters.categories.some((cat: string) => {
-    if (cat === 'GK') return pos === 'GK';
+    if (cat === 'GK')  return pos === 'GK';
     if (cat === 'DEF') return pos === 'D' || pos === 'SW' || pos === 'WB';
     if (cat === 'MID') return pos === 'M' || pos === 'DM' || pos === 'AM';
-    if (cat === 'ATT') return pos === 'AT' || pos === 'ST';
+    if (cat === 'ATT') return pos === 'AT';
     return false;
   });
 
   return (
     <main className="flex-1 flex flex-col bg-[#0E0E0E] overflow-hidden relative">
-      {/* Search Header - Compact */}
+      {/* Search Header */}
       <header className="h-[48px] px-6 flex items-center justify-between border-b border-[#1C1B1B] shrink-0 bg-[#0E0E0E] z-20">
         <div className="flex items-center gap-4">
           {isFilterCollapsed && (
@@ -124,19 +125,19 @@ export default function ScoutLab({
                 <tr className="bg-[#1C1B1B]/90 backdrop-blur-md text-white text-[13px] uppercase tracking-[0.1em] font-black w-full flex">
                   {columnOrder.map((colKey) => {
                     const columns: any = {
-                      save: { label: '', textAlign: 'center', sortKey: null },
-                      name: { label: 'PLAYER NAME', sortKey: 'name' },
-                      flag: { label: '', sortKey: 'nationalityName' },
-                      pos: { label: 'POS', textAlign: 'center', sortKey: 'pos' },
-                      age: { label: 'AGE', textAlign: 'center', sortKey: 'age' },
-                      clubName: { label: 'CLUB', sortKey: 'clubName' },
-                      value: { label: 'VALUE', textAlign: 'right', sortKey: 'value' },
-                      wage: { label: 'WAGES', textAlign: 'right', sortKey: 'wage' },
-                      currentAbility: { label: 'CA', textAlign: 'center', sortKey: 'currentAbility' },
-                      potentialAbility: { label: 'PA', textAlign: 'center', sortKey: 'potentialAbility' },
-                      injuryProne: { label: 'INJ', textAlign: 'center', sortKey: 'injuryProne' },
-                      impMatches: { label: 'IMP', textAlign: 'center', sortKey: 'impMatches' },
-                      consistency: { label: 'CNS', textAlign: 'center', sortKey: 'consistency' },
+                      save:             { label: '',        textAlign: 'center', sortKey: null },
+                      name:             { label: 'PLAYER NAME',                 sortKey: 'name' },
+                      flag:             { label: '',        textAlign: 'center', sortKey: 'nationalityName' },
+                      pos:              { label: 'POS',     textAlign: 'center', sortKey: 'pos' },
+                      age:              { label: 'AGE',     textAlign: 'center', sortKey: 'age' },
+                      clubName:         { label: 'CLUB',                        sortKey: 'clubName' },
+                      value:            { label: 'VALUE',   textAlign: 'right',  sortKey: 'value' },
+                      wage:             { label: 'WAGES',   textAlign: 'right',  sortKey: 'wage' },
+                      currentAbility:   { label: 'CA',      textAlign: 'center', sortKey: 'currentAbility' },
+                      potentialAbility: { label: 'PA',      textAlign: 'center', sortKey: 'potentialAbility' },
+                      injuryProne:      { label: 'INJ',     textAlign: 'center', sortKey: 'injuryProne' },
+                      impMatches:       { label: 'IMP',     textAlign: 'center', sortKey: 'impMatches' },
+                      consistency:      { label: 'CNS',     textAlign: 'center', sortKey: 'consistency' },
                     };
                     ALL_ATTRIBUTES.forEach(attr => {
                       if (!columns[attr]) {
@@ -223,17 +224,15 @@ export default function ScoutLab({
                       setContextMenu({ x: e.pageX, y: e.pageY, colKey: columnOrder[columnOrder.length - 1] });
                     }}
                   >
-                    <button className="text-white font-bebas text-2xl leading-none opacity-40 group-hover:opacity-100 group-hover:text-[#E8F000] transition-all">
-                      +
-                    </button>
+                    <button className="text-white font-bebas text-2xl leading-none opacity-40 group-hover:opacity-100 group-hover:text-[#E8F000] transition-all">+</button>
                   </th>
                 </tr>
               </thead>
               <tbody className="text-[14px] font-sans">
                 {currentItems.map((player) => {
-                  const consistency = player.attributes['Consistency'] || 0;
-                  const impMatches = player.attributes['ImportantMatches'] || 0;
-                  const injuryProne = player.attributes['InjuryProneness'] || 0;
+                  const consistency  = player.attributes['Consistency']     || 0;
+                  const impMatches   = player.attributes['ImportantMatches'] || 0;
+                  const injuryProne  = player.attributes['InjuryProneness']  || 0;
 
                   return (
                     <tr 
@@ -243,7 +242,7 @@ export default function ScoutLab({
                       {columnOrder.map(colKey => {
                         const width = `${columnWidths[colKey]}px`;
                         switch (colKey) {
-                          case 'save':
+                          case 'save': {
                             const isSaved = shortlist.includes(player.id);
                             return (
                               <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center flex items-center justify-center">
@@ -255,10 +254,13 @@ export default function ScoutLab({
                                 </button>
                               </td>
                             );
+                          }
                           case 'name':
                             return (
                               <td key={colKey} style={{ width, flexShrink: 0 }} onClick={() => navigate(`/player/${player.id}`)} className="p-[6px] pl-6 overflow-hidden flex items-center">
-                                <div className="font-sans text-[14px] text-white uppercase tracking-tighter group-hover:text-scout-yellow transition-colors truncate font-medium flex items-center overflow-hidden whitespace-nowrap">{player.firstName} {player.lastName}</div>
+                                <div className="font-sans text-[14px] text-white uppercase tracking-tighter group-hover:text-scout-yellow transition-colors truncate font-medium flex items-center overflow-hidden whitespace-nowrap">
+                                  {player.commonName || `${player.firstName} ${player.lastName}`}
+                                </div>
                               </td>
                             );
                           case 'flag':
@@ -272,13 +274,21 @@ export default function ScoutLab({
                                 />
                               </td>
                             );
-                          case 'pos':
-      const getPrimaryPos = () => {
+                          case 'pos': {
+                            const getPrimaryPos = () => {
                               const vals = [
                                 { label: 'GK', val: (player.positions as any)['GK'] || 0 },
-                                { label: 'D', val: Object.entries(player.positions).filter(([k]) => k.startsWith('D') || k === 'SW' || k.startsWith('WB')).reduce((sum, [_, v]) => Math.max(sum, v), 0) },
-                                { label: 'M', val: Object.entries(player.positions).filter(([k]) => k.startsWith('M') || k.startsWith('DM') || k.startsWith('AM')).reduce((sum, [_, v]) => Math.max(sum, v), 0) },
-                                { label: 'AT', val: Object.entries(player.positions).filter(([k]) => k.startsWith('ST')).reduce((sum, [_, v]) => Math.max(sum, v), 0) }
+                                { label: 'D',  val: Math.max(
+                                    (player.positions as any)['D']  || 0,
+                                    (player.positions as any)['SW'] || 0,
+                                    (player.positions as any)['WB'] || 0
+                                  ) },
+                                { label: 'M',  val: Math.max(
+                                    (player.positions as any)['M']  || 0,
+                                    (player.positions as any)['DM'] || 0,
+                                    (player.positions as any)['AM'] || 0
+                                  ) },
+                                { label: 'AT', val: (player.positions as any)['AT'] || 0 }
                               ];
                               return vals.reduce((prev, curr) => (curr.val > prev.val ? curr : prev), vals[0]).label;
                             };
@@ -290,10 +300,16 @@ export default function ScoutLab({
                                 </div>
                               </td>
                             );
+                          }
                           case 'age':
                             return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-outfit text-white/90 flex items-center justify-center">{player.age}</td>;
                           case 'clubName':
-                            return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-[14px] text-white uppercase tracking-tighter truncate font-medium flex items-center overflow-hidden whitespace-nowrap">{player.clubName}</td>;
+                            return (
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] flex flex-col justify-center overflow-hidden">
+                                <div className="text-[13px] text-white uppercase tracking-tighter truncate font-medium whitespace-nowrap">{player.clubName}</div>
+                                {player.divisionName && <div className="text-[9px] text-[#666] truncate whitespace-nowrap tracking-tight">{player.divisionName}</div>}
+                              </td>
+                            );
                           case 'value':
                             return (
                               <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-outfit font-bold text-white tracking-tighter flex items-center justify-end">
@@ -303,7 +319,7 @@ export default function ScoutLab({
                           case 'wage':
                             return (
                               <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-right font-outfit font-bold text-scout-yellow tracking-tighter flex items-center justify-end">
-                                {formatCurrency(player.wage).replace('.00', '').replace('M', 'K')}/W
+                                {formatCurrency(player.wage)}/W
                               </td>
                             );
                           case 'currentAbility':
