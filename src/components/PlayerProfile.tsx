@@ -59,18 +59,17 @@ export default function PlayerProfile({
   const attr = player.attributes;
  
   const radarData = [
-    { subject: 'ATTACK', A: ((attr['Finishing'] || 0) + (attr['Dribbling'] || 0) + (attr['OffTheBall'] || 0) + (attr['LongShots'] || 0)) / 4 },
-    { subject: 'VISION', A: ((attr['Creativity'] || 0) + (attr['Passing'] || 0) + (attr['Decisions'] || 0) + (attr['Anticipation'] || 0)) / 4 },
-    { subject: 'PHYSICAL', A: ((attr['Pace'] || 0) + (attr['Acceleration'] || 0) + (attr['Agility'] || 0) + (attr['Balance'] || 0) + (attr['Jumping'] || 0)) / 5 },
-    { subject: 'DEFENCE', A: ((attr['Tackling'] || 0) + (attr['Marking'] || 0) + (attr['Positioning'] || 0) + (attr['Heading'] || 0)) / 4 },
-    { subject: 'MENTALITY', A: ((attr['Bravery'] || 0) + (attr['Determination'] || 0) + (attr['WorkRate'] || 0) + (attr['Teamwork'] || 0)) / 4 },
-    { subject: 'PACE', A: ((attr['Pace'] || 0) + (attr['Acceleration'] || 0) + (attr['Agility'] || 0) + (attr['Balance'] || 0)) / 4 },
+    { subject: 'ATT', A: ((attr['Finishing'] || 0) + (attr['OffTheBall'] || 0) + (attr['Anticipation'] || 0) + (attr['Decisions'] || 0)) / 4 },
+    { subject: 'TECH', A: ((attr['Technique'] || 0) + (attr['Passing'] || 0) + (attr['Dribbling'] || 0) + (attr['Crossing'] || 0)) / 4 },
+    { subject: 'PHYS', A: ((attr['Acceleration'] || 0) + (attr['Pace'] || 0) + (attr['Stamina'] || 0) + (attr['Strength'] || 0) + (attr['Agility'] || 0)) / 5 },
+    { subject: 'DEF', A: ((attr['Tackling'] || 0) + (attr['Marking'] || 0) + (attr['Positioning'] || 0) + (attr['Heading'] || 0)) / 4 },
+    { subject: 'MENT', A: ((attr['Bravery'] || 0) + (attr['Determination'] || 0) + (attr['WorkRate'] || 0) + (attr['Teamwork'] || 0)) / 4 },
   ];
 
   const mainColumns = [
-    ["Acceleration", "Aggression", "Agility", "Anticipation", "Balance", "Bravery", "Creativity", "Crossing", "Decisions", "Determination", "Dribbling", "Finishing"],
-    ["Flair", "Handling", "Heading", "Influence", "Jumping", "LongShots", "Marking", "OffTheBall", "Pace", "Passing", "Positioning", "Reflexes"],
-    ["SetPieces", "Stamina", "Strength", "Tackling", "Teamwork", "Technique", "WorkRate"]
+    ["Acceleration", "Aggression", "Agility", "Anticipation", "Balance", "Bravery", "Corners", "Creativity", "Crossing", "Decisions", "Determination", "Dribbling"],
+    ["Finishing", "Flair", "Handling", "Heading", "Influence", "Jumping", "LongShots", "Marking", "OffTheBall", "OneOnOnes", "Pace", "Passing"],
+    ["Penalties", "Positioning", "Reflexes", "SetPieces", "Stamina", "Strength", "Tackling", "Teamwork", "Technique", "ThrowIns", "WorkRate"]
   ];
 
   const hiddenAttrs = [
@@ -258,52 +257,6 @@ export default function PlayerProfile({
                   );
                 })}
              </div>
-          </div>
-
-          {/* Player History Section */}
-          <div className="pt-8">
-            <h3 className="text-scout-yellow text-[11px] font-bold tracking-[0.2em] uppercase mb-[16px]">PLAYING CAREER</h3>
-            <div className="bg-[#1C1B1B] rounded-lg overflow-hidden border border-[#2A2A2A]">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[#2A2A2A] text-scout-yellow text-[9px] font-black tracking-widest uppercase">
-                    <th className="px-3 py-2">Season</th>
-                    <th className="px-3 py-2">Club</th>
-                    <th className="px-3 py-2 text-center">Apps</th>
-                    <th className="px-3 py-2 text-center">Gls</th>
-                    <th className="px-3 py-2 text-center">Asts</th>
-                    <th className="px-3 py-2 text-center">MoM</th>
-                    <th className="px-3 py-2 text-center">Pass</th>
-                    <th className="px-3 py-2 text-center">Tck</th>
-                    <th className="px-3 py-2 text-center">Drb</th>
-                    <th className="px-3 py-2 text-center">Sh Tar</th>
-                    <th className="px-3 py-2 text-center">Av R</th>
-                  </tr>
-                </thead>
-                <tbody className="text-[11px] font-medium text-white">
-                  {(player.history || []).map((h: any, i: number) => (
-                    <tr key={i} className={`border-t border-[#2A2A2A] ${i % 2 === 0 ? 'bg-transparent' : 'bg-[#202020]'}`}>
-                      <td className="px-3 py-1.5 text-[#888888]">{h.season}</td>
-                      <td className="px-3 py-1.5">{h.club}</td>
-                      <td className="px-3 py-1.5 text-center text-scout-yellow font-outfit font-bold">{h.apps}</td>
-                      <td className="px-3 py-1.5 text-center text-scout-yellow font-outfit font-bold">{h.gls}</td>
-                      <td className="px-3 py-1.5 text-center text-scout-yellow font-outfit font-bold">{h.asts}</td>
-                      <td className="px-3 py-1.5 text-center text-scout-yellow font-outfit font-bold">{h.mom}</td>
-                      <td className="px-3 py-1.5 text-center text-[#888888] font-outfit">{h.passPct}</td>
-                      <td className="px-3 py-1.5 text-center text-[#888888] font-outfit">{h.tck}</td>
-                      <td className="px-3 py-1.5 text-center text-[#888888] font-outfit">{h.drb}</td>
-                      <td className="px-3 py-1.5 text-center text-[#888888] font-outfit">{h.shTar}</td>
-                      <td className={`px-3 py-1.5 text-center font-bold font-outfit ${parseFloat(h.avR) >= 7.5 ? 'text-scout-yellow' : 'text-[#888888]'}`}>{h.avR}</td>
-                    </tr>
-                  ))}
-                  {(!player.history || player.history.length === 0) && (
-                    <tr>
-                      <td colSpan={11} className="px-3 py-8 text-center text-[#444444] uppercase tracking-widest italic font-bold">No History Data Available</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
 

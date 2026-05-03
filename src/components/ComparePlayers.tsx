@@ -58,40 +58,46 @@ export default function ComparePlayers({
   };
 
   const categories = [
-    { name: 'ATTACKING', attributes: ['finishing', 'offTheBall', 'longShots', 'composure'] },
-    { name: 'TECHNICAL', attributes: ['technique', 'dribbling', 'passing', 'freeKicks', 'corners'] },
-    { name: 'PHYSICAL', attributes: ['acceleration', 'pace', 'stamina', 'strength', 'agility', 'jumping'] },
-    { name: 'MENTAL', attributes: ['determination', 'workRate', 'creativity', 'bravery', 'decisions', 'aggression', 'positioning'] },
-    { name: 'DEFENDING', attributes: ['tackling', 'marking', 'heading'] },
-    { name: 'GOALKEEPING', attributes: ['handling', 'reflexes', 'oneOnOnes'] }
+    { name: 'ATTACKING', attributes: ['Finishing', 'OffTheBall', 'LongShots', 'Penalties', 'Flair'] },
+    { name: 'TECHNICAL', attributes: ['Technique', 'Dribbling', 'Passing', 'SetPieces', 'Corners', 'Crossing', 'ThrowIns'] },
+    { name: 'PHYSICAL', attributes: ['Acceleration', 'Pace', 'Stamina', 'Strength', 'Agility', 'Jumping'] },
+    { name: 'MENTAL', attributes: ['Determination', 'WorkRate', 'Creativity', 'Bravery', 'Decisions', 'Aggression', 'Positioning', 'Influence', 'Anticipation'] },
+    { name: 'DEFENDING', attributes: ['Tackling', 'Marking', 'Heading'] },
+    { name: 'GOALKEEPING', attributes: ['Handling', 'Reflexes', 'OneOnOnes'] }
   ];
 
   // Radar Data
+  const getRadarAvg = (p: Player | undefined, attrs: string[]) => {
+    if (!p) return 0;
+    const sum = attrs.reduce((acc, attr) => acc + (p.attributes[attr] || 0), 0);
+    return sum / attrs.length;
+  };
+
   const radarData = [
     { 
       subject: 'ATT', 
-      A: playerA ? (playerA.attributes.finishing + playerA.attributes.offTheBall) / 2 : 0, 
-      B: playerB ? (playerB.attributes.finishing + playerB.attributes.offTheBall) / 2 : 0 
+      A: getRadarAvg(playerA, ['Finishing', 'OffTheBall', 'Anticipation', 'Decisions']),
+      B: getRadarAvg(playerB, ['Finishing', 'OffTheBall', 'Anticipation', 'Decisions'])
     },
     { 
       subject: 'TECH', 
-      A: playerA ? (playerA.attributes.technique + playerA.attributes.passing) / 2 : 0, 
-      B: playerB ? (playerB.attributes.technique + playerB.attributes.passing) / 2 : 0 
+      A: getRadarAvg(playerA, ['Technique', 'Passing', 'Dribbling', 'Crossing']),
+      B: getRadarAvg(playerB, ['Technique', 'Passing', 'Dribbling', 'Crossing'])
     },
     { 
       subject: 'PHYS', 
-      A: playerA ? (playerA.attributes.acceleration + playerA.attributes.pace) / 2 : 0, 
-      B: playerB ? (playerB.attributes.acceleration + playerB.attributes.pace) / 2 : 0 
+      A: getRadarAvg(playerA, ['Acceleration', 'Pace', 'Stamina', 'Strength', 'Agility']),
+      B: getRadarAvg(playerB, ['Acceleration', 'Pace', 'Stamina', 'Strength', 'Agility'])
     },
     { 
       subject: 'MENT', 
-      A: playerA ? (playerA.attributes.determination + playerA.attributes.creativity) / 2 : 0, 
-      B: playerB ? (playerB.attributes.determination + playerB.attributes.creativity) / 2 : 0 
+      A: getRadarAvg(playerA, ['Determination', 'WorkRate', 'Creativity', 'Influence', 'Teamwork']),
+      B: getRadarAvg(playerB, ['Determination', 'WorkRate', 'Creativity', 'Influence', 'Teamwork'])
     },
     { 
       subject: 'DEFEN', 
-      A: playerA ? (playerA.attributes.tackling + playerA.attributes.marking) / 2 : 0, 
-      B: playerB ? (playerB.attributes.tackling + playerB.attributes.marking) / 2 : 0 
+      A: getRadarAvg(playerA, ['Tackling', 'Marking', 'Positioning', 'Heading']),
+      B: getRadarAvg(playerB, ['Tackling', 'Marking', 'Positioning', 'Heading'])
     },
   ];
 
@@ -99,12 +105,12 @@ export default function ComparePlayers({
     <div className="relative">
       <button 
         onClick={() => setActiveActions(activeActions === playerId ? null : playerId)}
-        className="flex items-center gap-2 px-3 py-1 bg-[#1C1B1B] rounded text-[10px] text-[#888888] font-bold tracking-widest hover:text-white transition-colors"
+        className="flex items-center gap-2 px-3 py-1 bg-[#1C1B1B] rounded text-[10px] text-[#888888] font-bold tracking-widest hover:text-white transition-colors border border-[#2A2A2A]"
       >
         ACTIONS <ChevronDown size={12} />
       </button>
       {activeActions === playerId && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-56 bg-[#1C1B1B] border border-[#2A2A2A] rounded shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-56 bg-[#0E0E0E] border border-scout-yellow/30 rounded shadow-2xl z-50 overflow-hidden">
           {[
             { 
               label: shortlist.includes(playerId) ? 'REMOVE FROM SHORTLIST' : 'ADD TO SHORTLIST', 
@@ -116,12 +122,11 @@ export default function ComparePlayers({
               icon: LayoutGrid,
               onClick: () => removeFromCompare(slot)
             },
-            { label: 'ADD TO XI', icon: Users, onClick: () => {} }
           ].map((act, i) => (
             <button 
               key={i} 
               onClick={() => { act.onClick(); setActiveActions(null); }}
-              className="w-full px-4 py-2 text-left text-[10px] font-bold tracking-widest text-[#888888] hover:bg-[#E8F000] hover:text-black flex items-center gap-3 transition-colors"
+              className="w-full px-4 py-3 text-left text-[10px] font-bold tracking-widest text-[#888888] hover:bg-scout-yellow hover:text-black flex items-center gap-3 transition-colors border-b border-[#1C1B1B] last:border-0"
             >
               <act.icon size={12} />
               {act.label}

@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CM0102Parser, Player } from './lib/CM0102Parser';
-import { mockPlayerData } from './lib/mockData';
 import { ALL_ATTRIBUTES } from './lib/constants';
 import ScoutLab from './components/ScoutLab';
 import PlayerProfile from './components/PlayerProfile';
@@ -101,19 +100,21 @@ function MainLayout({
 }
 
 export default function App() {
-  const [view, setView] = useState<ViewType>('scout-lab');
-  const [players, setPlayers] = useState<Player[]>(mockPlayerData as unknown as Player[]);
-  const [shortlist, setShortlist] = useState<number[]>([1, 2, 5]);
+  const [view, setView] = useState<ViewType>('import');
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
+  const [clubs, setClubs] = useState<any[]>([]);
+  const [shortlist, setShortlist] = useState<number[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [gameDate, setGameDate] = useState<Date | null>(new Date(2001, 7, 1));
+  const [gameDate, setGameDate] = useState<Date | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [stats, setStats] = useState({
-    avgCA: 142,
-    clubsFound: 5,
+    avgCA: 0,
+    clubsFound: 0,
     latency: 0,
-    totalRecords: mockPlayerData.length,
-    positions: { GK: 0, DEF: 2, MID: 2, FWD: 2 }
+    totalRecords: 0,
+    positions: { GK: 0, DEF: 0, MID: 0, FWD: 0 }
   });
 
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -195,7 +196,7 @@ export default function App() {
     try {
       const buffer = await file.arrayBuffer();
       const parser = new CM0102Parser(buffer, (msg, type) => addLog(msg, type));
-      const { players: parsedPlayers, positionCounts, gameDate: parsedDate } = await parser.parse();
+      const { players: parsedPlayers, staff: parsedStaff, clubs: parsedClubs, gameDate: parsedDate, positionCounts } = await parser.parse();
       
       clearInterval(progressInterval);
       setImportProgress(100);
@@ -203,22 +204,23 @@ export default function App() {
       const endTime = performance.now();
       const latency = Math.round(endTime - startTime);
       
-      const uniqueClubs = new Set(parsedPlayers.map(p => p.clubName)).size;
-
       setPlayers(parsedPlayers);
+      setStaff(parsedStaff);
+      setClubs(parsedClubs);
       setGameDate(parsedDate);
       setStats({
         avgCA: 0,
-        clubsFound: uniqueClubs,
+        clubsFound: parsedClubs.length,
         latency,
-        totalRecords: parsedPlayers.length,
+        totalRecords: parsedPlayers.length + parsedStaff.length,
         positions: positionCounts
       });
       
-      addLog(`Ready. Table view populated with ${parsedPlayers.length} players. Game Date: ${parsedDate?.toDateString() || 'N/A'}`, 'success');
+      addLog(`Ready. Table view populated with ${parsedPlayers.length} players. ${parsedStaff.length} staff and ${parsedClubs.length} clubs loaded.`, 'success');
       if (parsedPlayers.length > 0) {
         const sample = parsedPlayers[0];
         addLog(`Sample player: ${sample.firstName} ${sample.lastName}, Age: ${sample.age}, Club: ${sample.clubName}`, 'info');
+        setView('scout-lab');
       }
       setIsParsing(false);
     } catch (error) {
