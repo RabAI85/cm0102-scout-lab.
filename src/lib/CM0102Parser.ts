@@ -1,7 +1,8 @@
 // ============================================================
 // CM0102Parser.ts
 // Ported from CMScoutIntrinsic C# Source (DataService.cs)
-// Corrected attribute byte order and CA18 conversion logic.
+// CA18 attributes use InMatchNormalized (the app's default view).
+// Non-CA18 attributes show raw intrinsic values (1-20).
 // ============================================================
 
 export interface Player {
@@ -24,10 +25,7 @@ export interface Player {
     current: number;
     world: number;
   };
-  /** In-game visible attribute values (CA-scaled for isCA18 attrs). */
   attributes: Record<string, number>;
-  /** Raw intrinsic values straight from the save file (-128..128). */
-  intrinsicAttributes: Record<string, number>;
   positions: Record<string, number>;
   preferredFoot: string;
 }
@@ -66,6 +64,88 @@ export interface Club {
   attendance: number;
 }
 
+// ── Attribute metadata ──────────────────────────────────────────
+export interface AttrDef {
+  isCA18: boolean;
+  isLessBetter: boolean;
+}
+
+export const ATTR_DEFS: Record<string, AttrDef> = {
+  'Anticipation':    { isCA18: true,  isLessBetter: false },
+  'Creativity':      { isCA18: true,  isLessBetter: false },
+  'Crossing':        { isCA18: true,  isLessBetter: false },
+  'Decisions':       { isCA18: true,  isLessBetter: false },
+  'Dribbling':       { isCA18: true,  isLessBetter: false },
+  'Finishing':       { isCA18: true,  isLessBetter: false },
+  'Heading':         { isCA18: true,  isLessBetter: false },
+  'LongShots':       { isCA18: true,  isLessBetter: false },
+  'Marking':         { isCA18: true,  isLessBetter: false },
+  'OffTheBall':      { isCA18: true,  isLessBetter: false },
+  'Passing':         { isCA18: true,  isLessBetter: false },
+  'Penalties':       { isCA18: true,  isLessBetter: false },
+  'Positioning':     { isCA18: true,  isLessBetter: false },
+  'Tackling':        { isCA18: true,  isLessBetter: false },
+  'ThrowIns':        { isCA18: true,  isLessBetter: false },
+  'Handling':        { isCA18: true,  isLessBetter: false },
+  'OneOnOnes':       { isCA18: true,  isLessBetter: false },
+  'Reflexes':        { isCA18: true,  isLessBetter: false },
+  'Acceleration':    { isCA18: false, isLessBetter: false },
+  'Agility':         { isCA18: false, isLessBetter: false },
+  'Balance':         { isCA18: false, isLessBetter: false },
+  'Jumping':         { isCA18: false, isLessBetter: false },
+  'NaturalFitness':  { isCA18: false, isLessBetter: false },
+  'Pace':            { isCA18: false, isLessBetter: false },
+  'Stamina':         { isCA18: false, isLessBetter: false },
+  'Strength':        { isCA18: false, isLessBetter: false },
+  'Aggression':      { isCA18: false, isLessBetter: false },
+  'Bravery':         { isCA18: false, isLessBetter: false },
+  'Consistency':     { isCA18: false, isLessBetter: false },
+  'Corners':         { isCA18: false, isLessBetter: false },
+  'Dirtiness':       { isCA18: false, isLessBetter: true  },
+  'Flair':           { isCA18: false, isLessBetter: false },
+  'ImportantMatches':{ isCA18: false, isLessBetter: false },
+  'Influence':       { isCA18: false, isLessBetter: false },
+  'InjuryProneness': { isCA18: false, isLessBetter: true  },
+  'LeftFoot':        { isCA18: false, isLessBetter: false },
+  'RightFoot':       { isCA18: false, isLessBetter: false },
+  'SetPieces':       { isCA18: false, isLessBetter: false },
+  'Teamwork':        { isCA18: false, isLessBetter: false },
+  'Technique':       { isCA18: false, isLessBetter: false },
+  'Versatility':     { isCA18: false, isLessBetter: false },
+  'WorkRate':        { isCA18: false, isLessBetter: false },
+  'Adaptability':    { isCA18: false, isLessBetter: false },
+  'Ambition':        { isCA18: false, isLessBetter: false },
+  'Determination':   { isCA18: false, isLessBetter: false },
+  'Loyalty':         { isCA18: false, isLessBetter: false },
+  'Pressure':        { isCA18: false, isLessBetter: false },
+  'Professionalism': { isCA18: false, isLessBetter: false },
+  'Sportsmanship':   { isCA18: false, isLessBetter: false },
+  'Temperament':     { isCA18: false, isLessBetter: false },
+};
+
+// CA18 attributes in the same order as DataService.Attributes[].
+// gkOnly = true means the normalization range is built only from GK players.
+const CA18_ATTRS: { name: string; gkOnly: boolean }[] = [
+  { name: 'Anticipation', gkOnly: false },
+  { name: 'Creativity',   gkOnly: false },
+  { name: 'Crossing',     gkOnly: false },
+  { name: 'Decisions',    gkOnly: false },
+  { name: 'Dribbling',    gkOnly: false },
+  { name: 'Finishing',    gkOnly: false },
+  { name: 'Heading',      gkOnly: false },
+  { name: 'LongShots',    gkOnly: false },
+  { name: 'Marking',      gkOnly: false },
+  { name: 'OffTheBall',   gkOnly: false },
+  { name: 'Passing',      gkOnly: false },
+  { name: 'Penalties',    gkOnly: false },
+  { name: 'Positioning',  gkOnly: false },
+  { name: 'Tackling',     gkOnly: false },
+  { name: 'ThrowIns',     gkOnly: false },
+  { name: 'Handling',     gkOnly: true  },
+  { name: 'OneOnOnes',    gkOnly: true  },
+  { name: 'Reflexes',     gkOnly: true  },
+];
+
 // ── Compression-Aware Binary Reader ───────────────────────────
 
 class CMBinaryReader {
@@ -93,10 +173,7 @@ class CMBinaryReader {
       if (this.pos >= this.buffer.byteLength) return 0;
       return this.view.getUint8(this.pos++);
     }
-    if (this.rleRunCount > 0) {
-      this.rleRunCount--;
-      return this.rleByte;
-    }
+    if (this.rleRunCount > 0) { this.rleRunCount--; return this.rleByte; }
     if (this.pos >= this.buffer.byteLength) return 0;
     const b = this.view.getUint8(this.pos++);
     if (b <= 128) return b;
@@ -111,17 +188,14 @@ class CMBinaryReader {
   }
 
   public readInt16(): number {
-    const b1 = this.readByte();
-    const b2 = this.readByte();
-    const val = b1 | (b2 << 8);
-    return val > 32767 ? val - 65536 : val;
+    const b1 = this.readByte(), b2 = this.readByte();
+    const v = b1 | (b2 << 8);
+    return v > 32767 ? v - 65536 : v;
   }
 
   public readInt32(): number {
-    const b1 = this.readByte();
-    const b2 = this.readByte();
-    const b3 = this.readByte();
-    const b4 = this.readByte();
+    const b1 = this.readByte(), b2 = this.readByte(),
+          b3 = this.readByte(), b4 = this.readByte();
     return (b1 | (b2 << 8) | (b3 << 16) | (b4 << 24)) | 0;
   }
 
@@ -136,11 +210,8 @@ class CMBinaryReader {
     for (let i = 0; i < len; i++) buf[i] = this.readByte();
     let end = buf.indexOf(0);
     if (end === -1) end = len;
-    try {
-      return new TextDecoder('windows-1252').decode(buf.slice(0, end));
-    } catch {
-      return new TextDecoder('iso-8859-1').decode(buf.slice(0, end));
-    }
+    try { return new TextDecoder('windows-1252').decode(buf.slice(0, end)); }
+    catch { return new TextDecoder('iso-8859-1').decode(buf.slice(0, end)); }
   }
 
   public skip(count: number): void {
@@ -148,102 +219,17 @@ class CMBinaryReader {
   }
 }
 
-// ── CA18 Attribute Definitions (ported from DataService.Attributes[]) ─────
-//
-// isCA18       – attribute is scaled with HighConvert/LowConvert using CA.
-// isLessBetter – lower value is better (InjuryProneness, Dirtiness).
-// gkConvert    – how GK/outfield split is applied:
-//   'alwaysHigh' – HighConvert regardless of position
-//   'gkLow'      – GK gets LowConvert, outfield gets HighConvert
-//   'gkHigh'     – GK gets HighConvert, outfield gets LowConvert
-export interface AttrDef {
-  isCA18: boolean;
-  isLessBetter: boolean;
-  gkConvert: 'alwaysHigh' | 'gkLow' | 'gkHigh';
+// ── InMatchNormalized helpers (mirrors DataService.cs logic) ────
+
+function getInMatch(intrinsic: number, ca: number): number {
+  const r = intrinsic / 5.0 + ca / 20.0 + 10;
+  return Math.trunc(Math.max(0, r));
 }
 
-export const ATTR_DEFS: Record<string, AttrDef> = {
-  // ── CA18 = true ──────────────────────────────────────────────
-  // Neutral / outfield-preferred (always HighConvert)
-  'Anticipation':    { isCA18: true,  isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Decisions':       { isCA18: true,  isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Heading':         { isCA18: true,  isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'LongShots':       { isCA18: true,  isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Passing':         { isCA18: true,  isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Penalties':       { isCA18: true,  isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Positioning':     { isCA18: true,  isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Tackling':        { isCA18: true,  isLessBetter: false, gkConvert: 'alwaysHigh' },
-  // Outfield prefers HighConvert; GK gets LowConvert
-  'Creativity':      { isCA18: true,  isLessBetter: false, gkConvert: 'gkLow' },
-  'Crossing':        { isCA18: true,  isLessBetter: false, gkConvert: 'gkLow' },
-  'Dribbling':       { isCA18: true,  isLessBetter: false, gkConvert: 'gkLow' },
-  'Finishing':       { isCA18: true,  isLessBetter: false, gkConvert: 'gkLow' },
-  'Marking':         { isCA18: true,  isLessBetter: false, gkConvert: 'gkLow' },
-  'OffTheBall':      { isCA18: true,  isLessBetter: false, gkConvert: 'gkLow' },
-  'ThrowIns':        { isCA18: true,  isLessBetter: false, gkConvert: 'gkLow' },
-  // GK-specific: GK gets HighConvert, outfield gets LowConvert
-  'Handling':        { isCA18: true,  isLessBetter: false, gkConvert: 'gkHigh' },
-  'OneOnOnes':       { isCA18: true,  isLessBetter: false, gkConvert: 'gkHigh' },
-  'Reflexes':        { isCA18: true,  isLessBetter: false, gkConvert: 'gkHigh' },
-  // ── CA18 = false (raw intrinsic, clamped 1-20) ───────────────
-  'Acceleration':    { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Aggression':      { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Agility':         { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Balance':         { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Bravery':         { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Consistency':     { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Corners':         { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Dirtiness':       { isCA18: false, isLessBetter: true,  gkConvert: 'alwaysHigh' },
-  'Flair':           { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'ImportantMatches':{ isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Influence':       { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'InjuryProneness': { isCA18: false, isLessBetter: true,  gkConvert: 'alwaysHigh' },
-  'Jumping':         { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'LeftFoot':        { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'NaturalFitness':  { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Pace':            { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'RightFoot':       { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'SetPieces':       { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Stamina':         { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Strength':        { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Teamwork':        { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Technique':       { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Versatility':     { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'WorkRate':        { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  // Staff mental (non-CA18, from CMStaff record)
-  'Adaptability':    { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Ambition':        { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Determination':   { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Loyalty':         { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Pressure':        { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Professionalism': { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Sportsmanship':   { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-  'Temperament':     { isCA18: false, isLessBetter: false, gkConvert: 'alwaysHigh' },
-};
-
-// ── Conversion Functions (ported from DataService.cs) ─────────
-
-function highConvert(ca: number, val: number): number {
-  const d = (val / 10.0) + (ca / 20.0) + 10;
-  return Math.max(1, Math.min(20, Math.floor((d * d / 30.0) + (d / 3.0) + 0.5)));
-}
-
-function lowConvert(ca: number, val: number): number {
-  const d = (val / 10.0) + (ca / 200.0) + 10;
-  return Math.max(1, Math.min(20, Math.floor((d * d / 30.0) + (d / 3.0) + 0.5)));
-}
-
-function computeInGame(name: string, intrinsic: number, ca: number, isGK: boolean): number {
-  const def = ATTR_DEFS[name];
-  if (!def || !def.isCA18) {
-    return Math.max(1, Math.min(20, Math.abs(intrinsic)));
-  }
-  const v = Math.abs(intrinsic);
-  switch (def.gkConvert) {
-    case 'alwaysHigh': return highConvert(ca, v);
-    case 'gkLow':      return isGK ? lowConvert(ca, v) : highConvert(ca, v);
-    case 'gkHigh':     return isGK ? highConvert(ca, v) : lowConvert(ca, v);
-  }
+function normalizeInMatch(inMatch: number, min: number, max: number): number {
+  if (max <= min) return 10;
+  const r = 20.0 * (inMatch - min) / (max - min) + 0.5;
+  return Math.max(1, Math.min(20, Math.trunc(r)));
 }
 
 // ── Parser Main Class ──────────────────────────────────────────
@@ -253,7 +239,7 @@ export class CM0102Parser {
   private log: (msg: string, type?: 'info' | 'success' | 'error') => void;
   private blocks: Map<string, { position: number; size: number }> = new Map();
   private gameDate: Date | null = null;
-  private isCompressed: boolean = false;
+  private isCompressed = false;
 
   constructor(
     buffer: ArrayBuffer,
@@ -263,14 +249,13 @@ export class CM0102Parser {
     this.log = logger || (() => {});
   }
 
-  private readCMDate(reader: CMBinaryReader): Date | null {
-    const day  = reader.readInt16();
-    const year = reader.readInt16();
-    reader.readInt32(); // isLeapYear
+  private readCMDate(r: CMBinaryReader): Date | null {
+    const day = r.readInt16(), year = r.readInt16();
+    r.readInt32(); // isLeapYear
     if (day === 0 && year === 0) return null;
-    const date = new Date(year, 0, 1);
-    date.setDate(date.getDate() + day);
-    return date;
+    const d = new Date(year, 0, 1);
+    d.setDate(d.getDate() + day);
+    return d;
   }
 
   public async parse(): Promise<{
@@ -280,28 +265,23 @@ export class CM0102Parser {
     gameDate: Date | null;
     positionCounts: Record<string, number>;
   }> {
-    const headerView = new DataView(this.buffer);
-    this.isCompressed = headerView.getInt32(0, true) === 4;
-    const numBlocks   = headerView.getInt32(8, true);
+    const hv = new DataView(this.buffer);
+    this.isCompressed = hv.getInt32(0, true) === 4;
+    const numBlocks   = hv.getInt32(8, true);
 
-    // Block directory is never compressed — read with uncompressed reader
     for (let i = 0; i < numBlocks; i++) {
-      const pos  = headerView.getInt32(12 + i * 268, true);
-      const size = headerView.getInt32(16 + i * 268, true);
-      const nameBytes = new Uint8Array(this.buffer, 20 + i * 268, 260);
-      let end = nameBytes.indexOf(0);
+      const pos  = hv.getInt32(12 + i * 268, true);
+      const size = hv.getInt32(16 + i * 268, true);
+      const nb = new Uint8Array(this.buffer, 20 + i * 268, 260);
+      let end = nb.indexOf(0);
       if (end === -1) end = 260;
       const name = new TextDecoder('windows-1252')
-        .decode(nameBytes.slice(0, end))
-        .toLowerCase()
-        .split('\\')
-        .pop() || '';
+        .decode(nb.slice(0, end)).toLowerCase().split('\\').pop() || '';
       this.blocks.set(name, { position: pos, size });
     }
 
     const r = new CMBinaryReader(this.buffer, this.isCompressed);
 
-    // 1. Game date (general.dat)
     const genBlock = this.blocks.get('general.dat');
     if (genBlock) {
       r.seek(genBlock.position);
@@ -310,20 +290,40 @@ export class CM0102Parser {
       this.log(`Game date: ${this.gameDate?.toDateString()}`, 'success');
     }
 
-    // 2. Reference data
     const nationsMap   = this.loadNations(r);
     const divisionsMap = this.loadDivisions(r);
     const clubsMap     = this.loadClubs(r, nationsMap, divisionsMap);
     const firstNames   = this.loadNames(r, 'first_names.dat');
     const secondNames  = this.loadNames(r, 'second_names.dat');
     const commonNames  = this.loadNames(r, 'common_names.dat');
-
-    // 3. Raw player data
     const rawPlayerMap = this.loadRawPlayers(r);
 
-    // 4. Staff records → build Player list
-    const finalists: Player[]  = [];
-    const staffList: Staff[]   = [];
+    // ── Pass 1: compute inMatch min/max for each CA18 attribute ──
+    // Mirrors C# first pass in DataService.cs.
+    // For GK-specific attrs (Handling/OneOnOnes/Reflexes), only GK
+    // players contribute to the normalization range.
+    const inMatchRanges = new Map<string, { min: number; max: number }>();
+    for (const { name } of CA18_ATTRS) {
+      inMatchRanges.set(name, { min: 127, max: -128 });
+    }
+
+    for (const rp of rawPlayerMap.values()) {
+      if (rp.ca <= 0) continue; // skip placeholder entries
+      const isGK = rp.gk > 14;
+      for (const { name, gkOnly } of CA18_ATTRS) {
+        if (gkOnly && !isGK) continue;
+        const intrinsic = rp.namedAttrs[name] ?? 0;
+        const im = getInMatch(intrinsic, rp.ca);
+        const rng = inMatchRanges.get(name)!;
+        if (im < rng.min) rng.min = im;
+        if (im > rng.max) rng.max = im;
+      }
+    }
+    this.log('CA18 ranges computed.', 'info');
+
+    // ── Pass 2: build player objects ──────────────────────────────
+    const finalists: Player[] = [];
+    const staffList: Staff[]  = [];
     const positionCounts = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
 
     const staffBlock = this.blocks.get('staff.dat');
@@ -334,22 +334,21 @@ export class CM0102Parser {
       for (let i = 0; i < count; i++) {
         r.seek(staffBlock.position + i * 110);
 
-        const id       = r.readInt32();          // 4
-        const fNameId  = r.readInt32();          // 4
-        const sNameId  = r.readInt32();          // 4
-        const cNameId  = r.readInt32();          // 4
-        const dob      = this.readCMDate(r);     // 8  (CMDate)
-        r.readInt16();                            // 2  YearOfBirth
-        const fNationId = r.readInt32();         // 4
-        const sNationId = r.readInt32();         // 4
-        // IntApps(1) + IntGoals(1) + NationalJobId(4) + JobForNation(1)
-        // + DateJoinedNation(8) + DateExpiresNation(8) = 23 bytes
+        const id        = r.readInt32();
+        const fNameId   = r.readInt32();
+        const sNameId   = r.readInt32();
+        const cNameId   = r.readInt32();
+        const dob       = this.readCMDate(r);
+        r.readInt16();                         // YearOfBirth
+        const fNationId = r.readInt32();
+        const sNationId = r.readInt32();
+        // IntApps(1)+IntGoals(1)+NationalJobId(4)+JobForNation(1)+DateJoinedNation(8)+DateExpiresNation(8) = 23
         r.skip(23);
-        const clubJobId = r.readInt32();         // 4
-        // JobForClub(1) + DateJoinedClub(8) + DateExpiresClub(8) = 17 bytes
+        const clubJobId = r.readInt32();
+        // JobForClub(1)+DateJoinedClub(8)+DateExpiresClub(8) = 17
         r.skip(17);
-        const wage  = r.readInt32();             // 4
-        const value = r.readInt32();             // 4
+        const wage  = r.readInt32();
+        const value = r.readInt32();
 
         const adapt = r.readSByte();
         const amb   = r.readSByte();
@@ -362,7 +361,6 @@ export class CM0102Parser {
 
         r.skip(3); // PlayingSquad + Classification + ClubValuation
         const playerId = r.readInt32();
-        // StaffPreferencesId(4) + NonPlayerId(4) + SquadSelectedFor(1) are after
 
         const fName = firstNames.get(fNameId)  || '';
         const sName = secondNames.get(sNameId) || '';
@@ -377,33 +375,33 @@ export class CM0102Parser {
           const rp = rawPlayerMap.get(playerId);
           if (rp) {
             const isGK = rp.gk > 14;
-            const ca   = rp.ca;
+            const attrs: Record<string, number> = {};
 
-            const attrs: Record<string, number>          = {};
-            const intrinsicAttrs: Record<string, number> = {};
-
-            for (const [attrName, intrinsic] of Object.entries(rp.namedAttrs) as [string, number][]) {
-              intrinsicAttrs[attrName] = intrinsic;
-              attrs[attrName]          = computeInGame(attrName, intrinsic, ca, isGK);
+            for (const [k, v] of Object.entries(rp.namedAttrs) as [string, number][]) {
+              const def = ATTR_DEFS[k];
+              if (def?.isCA18) {
+                // InMatchNormalized — mirrors CMScoutIntrinsic default mode
+                const im  = getInMatch(v, rp.ca);
+                const rng = inMatchRanges.get(k)!;
+                attrs[k] = normalizeInMatch(im, rng.min, rng.max);
+              } else {
+                // Non-CA18: raw value clamped 1-20
+                attrs[k] = Math.max(1, Math.min(20, v < 0 ? 1 : v));
+              }
             }
 
-            // Staff mentals (non-CA18, stored as abs values)
-            const staffMentals: Record<string, number> = {
-              Adaptability:    Math.abs(adapt),
-              Ambition:        Math.abs(amb),
-              Determination:   Math.abs(det),
-              Loyalty:         Math.abs(loy),
-              Pressure:        Math.abs(pre),
-              Professionalism: Math.abs(pro),
-              Sportsmanship:   Math.abs(spo),
-              Temperament:     Math.abs(tem),
-            };
-            Object.assign(attrs, staffMentals);
-            Object.assign(intrinsicAttrs, staffMentals);
+            // Staff mentals from staff.dat (1-20, no conversion needed)
+            attrs['Adaptability']    = Math.max(1, Math.min(20, Math.abs(adapt)));
+            attrs['Ambition']        = Math.max(1, Math.min(20, Math.abs(amb)));
+            attrs['Determination']   = Math.max(1, Math.min(20, Math.abs(det)));
+            attrs['Loyalty']         = Math.max(1, Math.min(20, Math.abs(loy)));
+            attrs['Pressure']        = Math.max(1, Math.min(20, Math.abs(pre)));
+            attrs['Professionalism'] = Math.max(1, Math.min(20, Math.abs(pro)));
+            attrs['Sportsmanship']   = Math.max(1, Math.min(20, Math.abs(spo)));
+            attrs['Temperament']     = Math.max(1, Math.min(20, Math.abs(tem)));
 
-            // Positions
             const pos: Record<string, number> = {};
-            if (isGK)     { pos['GK'] = 20; positionCounts.GK++;  }
+            if (isGK)       { pos['GK'] = 20; positionCounts.GK++;  }
             if (rp.sw > 14) pos['SW'] = 20;
             if (rp.d  > 14) pos['D']  = 20;
             if (rp.dm > 14) pos['DM'] = 20;
@@ -413,13 +411,16 @@ export class CM0102Parser {
             if (rp.wb > 14) pos['WB'] = 20;
 
             if (!isGK) {
-              if (rp.d > 14)                                      positionCounts.DEF++;
-              else if (rp.m > 14 || rp.dm > 14 || rp.am > 14)   positionCounts.MID++;
-              else if (rp.at > 14)                               positionCounts.FWD++;
+              if (rp.d > 14)                                    positionCounts.DEF++;
+              else if (rp.m > 14 || rp.dm > 14 || rp.am > 14) positionCounts.MID++;
+              else if (rp.at > 14)                             positionCounts.FWD++;
             }
 
+            const lf = attrs['LeftFoot']  || 1;
+            const rf = attrs['RightFoot'] || 1;
+
             finalists.push({
-              id: id,
+              id,
               firstName: fName, lastName: sName, commonName: cName,
               age, dob,
               nationalityName:       nationsMap.get(fNationId) || 'Unknown',
@@ -427,13 +428,12 @@ export class CM0102Parser {
               clubName:     club?.name         || 'Free Agent',
               divisionName: club?.divisionName || '',
               wage, value,
-              currentAbility:   ca,
+              currentAbility:   rp.ca,
               potentialAbility: rp.pa,
               reputation: { home: rp.hRep, current: rp.cRep, world: rp.wRep },
-              attributes:          attrs,
-              intrinsicAttributes: intrinsicAttrs,
-              positions: pos,
-              preferredFoot: rp.lf > rp.rf ? 'Left' : (rp.rf > rp.lf ? 'Right' : 'Either'),
+              attributes: attrs,
+              positions:  pos,
+              preferredFoot: lf > rf ? 'Left' : (rf > lf ? 'Right' : 'Either'),
             });
           }
         } else {
@@ -442,125 +442,100 @@ export class CM0102Parser {
             dob,
             nationality: nationsMap.get(fNationId) || 'Unknown',
             clubName:    club?.name || 'Unemployed',
-            job:         'Staff',
-            wage, value,
-            adaptability:    Math.abs(adapt),
-            ambition:        Math.abs(amb),
-            determination:   Math.abs(det),
-            loyalty:         Math.abs(loy),
-            pressure:        Math.abs(pre),
-            professionalism: Math.abs(pro),
-            sportsmanship:   Math.abs(spo),
-            temperament:     Math.abs(tem),
+            job: 'Staff', wage, value,
+            adaptability:    Math.max(1, Math.min(20, Math.abs(adapt))),
+            ambition:        Math.max(1, Math.min(20, Math.abs(amb))),
+            determination:   Math.max(1, Math.min(20, Math.abs(det))),
+            loyalty:         Math.max(1, Math.min(20, Math.abs(loy))),
+            pressure:        Math.max(1, Math.min(20, Math.abs(pre))),
+            professionalism: Math.max(1, Math.min(20, Math.abs(pro))),
+            sportsmanship:   Math.max(1, Math.min(20, Math.abs(spo))),
+            temperament:     Math.max(1, Math.min(20, Math.abs(tem))),
             playerId: -1,
           });
         }
       }
     }
 
-    this.log(
-      `Parsed ${finalists.length} players, ${staffList.length} staff, ${clubsMap.size} clubs.`,
-      'success'
-    );
-
-    return {
-      players: finalists,
-      staff:   staffList,
-      clubs:   Array.from(clubsMap.values()),
-      gameDate: this.gameDate,
-      positionCounts,
-    };
+    this.log(`Parsed ${finalists.length} players, ${staffList.length} staff, ${clubsMap.size} clubs.`, 'success');
+    return { players: finalists, staff: staffList, clubs: Array.from(clubsMap.values()), gameDate: this.gameDate, positionCounts };
   }
 
   // ── Private loaders ───────────────────────────────────────────
 
-  private loadNames(reader: CMBinaryReader, file: string): Map<number, string> {
+  private loadNames(r: CMBinaryReader, file: string): Map<number, string> {
     const block = this.blocks.get(file);
     const map   = new Map<number, string>();
     if (!block) return map;
-    // CMName record = 60 bytes: Name(51) + Id(4) + NationId(4) + Count(1)
     const count = Math.floor(block.size / 60);
     for (let i = 0; i < count; i++) {
-      reader.seek(block.position + i * 60);
-      const name = reader.readString(51);
-      const id   = reader.readInt32();
+      r.seek(block.position + i * 60);
+      const name = r.readString(51);
+      const id   = r.readInt32();
       map.set(id, name);
     }
     return map;
   }
 
-  private loadNations(reader: CMBinaryReader): Map<number, string> {
+  private loadNations(r: CMBinaryReader): Map<number, string> {
     const block = this.blocks.get('nation.dat');
     const map   = new Map<number, string>();
     if (!block) return map;
-    // CMNation record = 290 bytes
     const count = Math.floor(block.size / 290);
     for (let i = 0; i < count; i++) {
-      reader.seek(block.position + i * 290);
-      const id   = reader.readInt32();
-      const name = reader.readString(51);
+      r.seek(block.position + i * 290);
+      const id   = r.readInt32();
+      const name = r.readString(51);
       map.set(id, name);
     }
     return map;
   }
 
-  private loadDivisions(reader: CMBinaryReader): Map<number, string> {
+  private loadDivisions(r: CMBinaryReader): Map<number, string> {
     const block = this.blocks.get('club_comp.dat');
     const map   = new Map<number, string>();
     if (!block) return map;
-    // CMDivision record = 107 bytes
-    // Id(4) + Name(51) + GenderName(1) + ShortName(26) + GenderShortName(1)
-    // + Code(4) + Scope(1) + Selected(1) + ContinentId(4) + NationId(4)
-    // + ForeColourId(4) + BackColourId(4) + Reputation(2) = 107
     const count = Math.floor(block.size / 107);
     for (let i = 0; i < count; i++) {
-      reader.seek(block.position + i * 107);
-      const id   = reader.readInt32();
-      const name = reader.readString(51);
+      r.seek(block.position + i * 107);
+      const id   = r.readInt32();
+      const name = r.readString(51);
       map.set(id, name);
     }
     return map;
   }
 
   private loadClubs(
-    reader: CMBinaryReader,
+    r: CMBinaryReader,
     nations: Map<number, string>,
     divisions: Map<number, string>
   ): Map<number, Club> {
     const block = this.blocks.get('club.dat');
     const map   = new Map<number, Club>();
     if (!block) return map;
-    // CMClub record = 581 bytes
     const count = Math.floor(block.size / 581);
     for (let i = 0; i < count; i++) {
-      reader.seek(block.position + i * 581);
-      const id         = reader.readInt32();
-      const name       = reader.readString(51);
-      reader.skip(1);                  // GenderName
-      reader.readString(26);           // ShortName (advance pointer)
-      reader.skip(1);                  // GenderShortName
-      const nationId   = reader.readInt32();
-      const divisionId = reader.readInt32();
-      reader.skip(4);                  // LastDivisionId
-      reader.skip(1);                  // LastPosition
-      reader.skip(4);                  // ReserveDivisionId
-      reader.skip(1);                  // ProfessionalStatus
-      const cash       = reader.readInt32();
-      const stadiumId  = reader.readInt32();
-      reader.skip(1);                  // OwnStadium
-      reader.skip(4);                  // ReserveStadiumId
-      reader.skip(1);                  // MatchDay
-      const attendance = reader.readInt32();
-      reader.skip(4);                  // MinAttendance
-      reader.skip(4);                  // MaxAttendance
-      const training   = reader.readSByte();
-      const rep        = reader.readInt16();
-
+      r.seek(block.position + i * 581);
+      const id         = r.readInt32();
+      const name       = r.readString(51);
+      r.skip(1);
+      r.readString(26);
+      r.skip(1);
+      const nationId   = r.readInt32();
+      const divisionId = r.readInt32();
+      r.skip(4); r.skip(1); r.skip(4); r.skip(1);
+      const cash       = r.readInt32();
+      const stadiumId  = r.readInt32();
+      r.skip(1); r.skip(4); r.skip(1);
+      const attendance = r.readInt32();
+      r.skip(4); r.skip(4);
+      const training   = r.readSByte();
+      const rep        = r.readInt16();
       map.set(id, {
         id, name, cash,
         reputation:   rep,
         training:     Math.max(0, training),
-        nationName:   nations.get(nationId)   || '',
+        nationName:   nations.get(nationId)     || '',
         divisionName: divisions.get(divisionId) || '',
         stadiumName:  `Stadium ${stadiumId}`,
         attendance,
@@ -569,91 +544,76 @@ export class CM0102Parser {
     return map;
   }
 
-  private loadRawPlayers(reader: CMBinaryReader): Map<number, any> {
+  private loadRawPlayers(r: CMBinaryReader): Map<number, any> {
     const block = this.blocks.get('player.dat');
     const map   = new Map<number, any>();
     if (!block) return map;
-    // CMPlayer record = 70 bytes (verified against C# struct)
     const count = Math.floor(block.size / 70);
     for (let i = 0; i < count; i++) {
-      reader.seek(block.position + i * 70);
+      r.seek(block.position + i * 70);
 
-      const id  = reader.readInt32();  // 4
-      reader.skip(1);                  // SquadNumber
-      const ca  = reader.readInt16();  // 2
-      const pa  = reader.readInt16();  // 2
-      const hRep = reader.readInt16(); // 2
-      const cRep = reader.readInt16(); // 2
-      const wRep = reader.readInt16(); // 2  → 15 bytes total
+      const id   = r.readInt32();
+      r.skip(1);                  // SquadNumber
+      const ca   = r.readInt16();
+      const pa   = r.readInt16();
+      const hRep = r.readInt16();
+      const cRep = r.readInt16();
+      const wRep = r.readInt16(); // 15 bytes total
 
-      // 12 position bytes
-      const gk = reader.readSByte(); // Goalkeeper
-      const sw = reader.readSByte(); // Sweeper
-      const d  = reader.readSByte(); // Defender
-      const dm = reader.readSByte(); // DefensiveMidfielder
-      const m  = reader.readSByte(); // Midfielder
-      const am = reader.readSByte(); // AttackingMidfielder
-      const at = reader.readSByte(); // Attacker
-      const wb = reader.readSByte(); // WingBack
-      const rs = reader.readSByte(); // RightSide
-      const ls = reader.readSByte(); // LeftSide
-      reader.skip(1);                // CentreSide
-      reader.skip(1);                // FreeRole  → 27 bytes total
+      const gk = r.readSByte(); const sw = r.readSByte();
+      const d  = r.readSByte(); const dm = r.readSByte();
+      const m  = r.readSByte(); const am = r.readSByte();
+      const at = r.readSByte(); const wb = r.readSByte();
+      r.skip(1); r.skip(1); r.skip(1); r.skip(1); // RightSide/LeftSide/CentreSide/FreeRole
 
-      // 43 attribute bytes in exact C# CMPlayer struct order:
+      // 43 attribute bytes — exact C# CMPlayer struct order
       const namedAttrs: Record<string, number> = {
-        Acceleration:    reader.readSByte(),
-        Aggression:      reader.readSByte(),
-        Agility:         reader.readSByte(),
-        Anticipation:    reader.readSByte(),
-        Balance:         reader.readSByte(),
-        Bravery:         reader.readSByte(),
-        Consistency:     reader.readSByte(),
-        Corners:         reader.readSByte(),
-        Crossing:        reader.readSByte(),
-        Decisions:       reader.readSByte(),
-        Dirtiness:       reader.readSByte(),
-        Dribbling:       reader.readSByte(),
-        Finishing:       reader.readSByte(),
-        Flair:           reader.readSByte(),
-        SetPieces:       reader.readSByte(),
-        Handling:        reader.readSByte(),
-        Heading:         reader.readSByte(),
-        ImportantMatches:reader.readSByte(),
-        InjuryProneness: reader.readSByte(),
-        Jumping:         reader.readSByte(),
-        Influence:       reader.readSByte(),
-        LeftFoot:        reader.readSByte(),
-        LongShots:       reader.readSByte(),
-        Marking:         reader.readSByte(),
-        OffTheBall:      reader.readSByte(),
-        NaturalFitness:  reader.readSByte(),
-        OneOnOnes:       reader.readSByte(),
-        Pace:            reader.readSByte(),
-        Passing:         reader.readSByte(),
-        Penalties:       reader.readSByte(),
-        Positioning:     reader.readSByte(),
-        Reflexes:        reader.readSByte(),
-        RightFoot:       reader.readSByte(),
-        Stamina:         reader.readSByte(),
-        Strength:        reader.readSByte(),
-        Tackling:        reader.readSByte(),
-        Teamwork:        reader.readSByte(),
-        Technique:       reader.readSByte(),
-        ThrowIns:        reader.readSByte(),
-        Versatility:     reader.readSByte(),
-        Creativity:      reader.readSByte(),
-        WorkRate:        reader.readSByte(),
+        Acceleration:    r.readSByte(),
+        Aggression:      r.readSByte(),
+        Agility:         r.readSByte(),
+        Anticipation:    r.readSByte(),
+        Balance:         r.readSByte(),
+        Bravery:         r.readSByte(),
+        Consistency:     r.readSByte(),
+        Corners:         r.readSByte(),
+        Crossing:        r.readSByte(),
+        Decisions:       r.readSByte(),
+        Dirtiness:       r.readSByte(),
+        Dribbling:       r.readSByte(),
+        Finishing:       r.readSByte(),
+        Flair:           r.readSByte(),
+        SetPieces:       r.readSByte(),
+        Handling:        r.readSByte(),
+        Heading:         r.readSByte(),
+        ImportantMatches:r.readSByte(),
+        InjuryProneness: r.readSByte(),
+        Jumping:         r.readSByte(),
+        Influence:       r.readSByte(),
+        LeftFoot:        r.readSByte(),
+        LongShots:       r.readSByte(),
+        Marking:         r.readSByte(),
+        OffTheBall:      r.readSByte(),
+        NaturalFitness:  r.readSByte(),
+        OneOnOnes:       r.readSByte(),
+        Pace:            r.readSByte(),
+        Passing:         r.readSByte(),
+        Penalties:       r.readSByte(),
+        Positioning:     r.readSByte(),
+        Reflexes:        r.readSByte(),
+        RightFoot:       r.readSByte(),
+        Stamina:         r.readSByte(),
+        Strength:        r.readSByte(),
+        Tackling:        r.readSByte(),
+        Teamwork:        r.readSByte(),
+        Technique:       r.readSByte(),
+        ThrowIns:        r.readSByte(),
+        Versatility:     r.readSByte(),
+        Creativity:      r.readSByte(),
+        WorkRate:        r.readSByte(),
       };
-      reader.readSByte(); // Morale — last byte, not exposed as a player attribute
+      r.readSByte(); // Morale
 
-      map.set(id, {
-        id, ca, pa, hRep, cRep, wRep,
-        gk, sw, d, dm, m, am, at, wb,
-        rf: Math.abs(rs),
-        lf: Math.abs(ls),
-        namedAttrs,
-      });
+      map.set(id, { id, ca, pa, hRep, cRep, wRep, gk, sw, d, dm, m, am, at, wb, namedAttrs });
     }
     return map;
   }
