@@ -258,6 +258,80 @@ export class CM0102Parser {
     return d;
   }
 
+  // Probe all combinations of numBlocks offset, entry layout (pos-first vs name-first),
+  // and name field length to find the best-scoring block table format.
+  private detectAndLoadBlocks(hv: DataView): void {
+    const fileSize   = this.buffer.byteLength;
+    const decoder    = new TextDecoder('windows-1252');
+    const nameLens   = [256, 260, 128];
+    const nbOffsets  = [4, 8];
+
+    let bestScore  = 0;
+    let bestBlocks = new Map<string, { position: number; size: number }>();
+
+    for (const nameLen of nameLens) {
+      for (const nbOff of nbOffsets) {
+        if (nbOff + 4 > fileSize) continue;
+        const numBlocks = hv.getInt32(nbOff, true);
+        if (numBlocks < 1 || numBlocks > 200) continue;
+
+        const tableStart = nbOff + 4;
+        const entrySize  = 4 + 4 + nameLen; // pos(4) + size(4) + name(nameLen)
+
+        // Try pos-first layout
+        const tryLayout = (posFirst: boolean) => {
+          const blocks = new Map<string, { position: number; size: number }>();
+          for (let i = 0; i < numBlocks; i++) {
+            const base = tableStart + i * entrySize;
+            if (base + entrySize > fileSize) return null;
+            let pos: number, sz: number, nameOff: number;
+            if (posFirst) {
+              pos     = hv.getInt32(base,     true);
+              sz      = hv.getInt32(base + 4, true);
+              nameOff = base + 8;
+            } else {
+              nameOff = base;
+              pos     = hv.getInt32(base + nameLen,     true);
+              sz      = hv.getInt32(base + nameLen + 4, true);
+            }
+            const nb  = new Uint8Array(this.buffer, nameOff, nameLen);
+            let end   = nb.indexOf(0);
+            if (end === -1) end = nameLen;
+            const name = decoder.decode(nb.slice(0, end)).toLowerCase().split('\\').pop() || '';
+            blocks.set(name, { position: pos, size: sz });
+          }
+          return blocks;
+        };
+
+        for (const posFirst of [true, false]) {
+          const blocks = tryLayout(posFirst);
+          if (!blocks) continue;
+
+          let score = 0;
+          for (const [name, block] of blocks.entries()) {
+            if (name.includes('.dat') && block.position > 0 && block.position < fileSize &&
+                block.size > 0 && block.size < fileSize) {
+              score++;
+              if (['player.dat','staff.dat','nation.dat','second_names.dat','common_names.dat']
+                  .includes(name)) score += 2;
+            }
+          }
+          if (score > bestScore) {
+            bestScore  = score;
+            bestBlocks = blocks;
+            this.log(`Block table candidate: nbOff=${nbOff} nameLen=${nameLen} ${posFirst ? 'pos-first' : 'name-first'} score=${score}`, 'info');
+          }
+        }
+      }
+    }
+
+    if (bestScore === 0) throw new Error(
+      'Could not detect block table format. Ensure this is an uncompressed CM 01/02 .sav file.'
+    );
+    this.blocks = bestBlocks;
+    this.log(`Blocks: ${Array.from(this.blocks.keys()).join(', ')}`, 'info');
+  }
+
   public async parse(): Promise<{
     players: Player[];
     staff: Staff[];
@@ -267,18 +341,7 @@ export class CM0102Parser {
   }> {
     const hv = new DataView(this.buffer);
     this.isCompressed = hv.getInt32(0, true) === 4;
-    const numBlocks   = hv.getInt32(8, true);
-
-    for (let i = 0; i < numBlocks; i++) {
-      const pos  = hv.getInt32(12 + i * 268, true);
-      const size = hv.getInt32(16 + i * 268, true);
-      const nb = new Uint8Array(this.buffer, 20 + i * 268, 260);
-      let end = nb.indexOf(0);
-      if (end === -1) end = 260;
-      const name = new TextDecoder('windows-1252')
-        .decode(nb.slice(0, end)).toLowerCase().split('\\').pop() || '';
-      this.blocks.set(name, { position: pos, size });
-    }
+    this.detectAndLoadBlocks(hv);
 
     const r = new CMBinaryReader(this.buffer, this.isCompressed);
 
