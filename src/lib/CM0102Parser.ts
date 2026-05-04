@@ -1,8 +1,7 @@
 // ============================================================
 // CM0102Parser.ts
-// Ported from CMScoutIntrinsic C# Source (DataService.cs)
-// CA18 attributes use InMatchNormalized (the app's default view).
-// Non-CA18 attributes show raw intrinsic values (1-20).
+// All attributes are read as raw intrinsic values (1-20),
+// matching exactly what CM 01/02 displays in the player profile.
 // ============================================================
 
 export interface Player {
@@ -123,28 +122,6 @@ export const ATTR_DEFS: Record<string, AttrDef> = {
   'Temperament':     { isCA18: false, isLessBetter: false },
 };
 
-// CA18 attributes in the same order as DataService.Attributes[].
-// gkOnly = true means the normalization range is built only from GK players.
-const CA18_ATTRS: { name: string; gkOnly: boolean }[] = [
-  { name: 'Anticipation', gkOnly: false },
-  { name: 'Creativity',   gkOnly: false },
-  { name: 'Crossing',     gkOnly: false },
-  { name: 'Decisions',    gkOnly: false },
-  { name: 'Dribbling',    gkOnly: false },
-  { name: 'Finishing',    gkOnly: false },
-  { name: 'Heading',      gkOnly: false },
-  { name: 'LongShots',    gkOnly: false },
-  { name: 'Marking',      gkOnly: false },
-  { name: 'OffTheBall',   gkOnly: false },
-  { name: 'Passing',      gkOnly: false },
-  { name: 'Penalties',    gkOnly: false },
-  { name: 'Positioning',  gkOnly: false },
-  { name: 'Tackling',     gkOnly: false },
-  { name: 'ThrowIns',     gkOnly: false },
-  { name: 'Handling',     gkOnly: true  },
-  { name: 'OneOnOnes',    gkOnly: true  },
-  { name: 'Reflexes',     gkOnly: true  },
-];
 
 // ── Compression-Aware Binary Reader ───────────────────────────
 
@@ -219,18 +196,6 @@ class CMBinaryReader {
   }
 }
 
-// ── InMatchNormalized helpers (mirrors DataService.cs logic) ────
-
-function getInMatch(intrinsic: number, ca: number): number {
-  const r = intrinsic / 5.0 + ca / 20.0 + 10;
-  return Math.trunc(Math.max(0, r));
-}
-
-function normalizeInMatch(inMatch: number, min: number, max: number): number {
-  if (max <= min) return 10;
-  const r = 20.0 * (inMatch - min) / (max - min) + 0.5;
-  return Math.max(1, Math.min(20, Math.trunc(r)));
-}
 
 // ── Parser Main Class ──────────────────────────────────────────
 
@@ -361,30 +326,7 @@ export class CM0102Parser {
     const commonNames  = this.loadNames(r, 'common_names.dat');
     const rawPlayerMap = this.loadRawPlayers(r);
 
-    // ── Pass 1: compute inMatch min/max for each CA18 attribute ──
-    // Mirrors C# first pass in DataService.cs.
-    // For GK-specific attrs (Handling/OneOnOnes/Reflexes), only GK
-    // players contribute to the normalization range.
-    const inMatchRanges = new Map<string, { min: number; max: number }>();
-    for (const { name } of CA18_ATTRS) {
-      inMatchRanges.set(name, { min: 127, max: -128 });
-    }
-
-    for (const rp of rawPlayerMap.values()) {
-      if (rp.ca <= 0) continue; // skip placeholder entries
-      const isGK = rp.gk > 14;
-      for (const { name, gkOnly } of CA18_ATTRS) {
-        if (gkOnly && !isGK) continue;
-        const intrinsic = rp.namedAttrs[name] ?? 0;
-        const im = getInMatch(intrinsic, rp.ca);
-        const rng = inMatchRanges.get(name)!;
-        if (im < rng.min) rng.min = im;
-        if (im > rng.max) rng.max = im;
-      }
-    }
-    this.log('CA18 ranges computed.', 'info');
-
-    // ── Pass 2: build player objects ──────────────────────────────
+    // ── Build player and staff objects ────────────────────────────
     const finalists: Player[] = [];
     const staffList: Staff[]  = [];
     const positionCounts = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
@@ -441,16 +383,7 @@ export class CM0102Parser {
             const attrs: Record<string, number> = {};
 
             for (const [k, v] of Object.entries(rp.namedAttrs) as [string, number][]) {
-              const def = ATTR_DEFS[k];
-              if (def?.isCA18) {
-                // InMatchNormalized — mirrors CMScoutIntrinsic default mode
-                const im  = getInMatch(v, rp.ca);
-                const rng = inMatchRanges.get(k)!;
-                attrs[k] = normalizeInMatch(im, rng.min, rng.max);
-              } else {
-                // Non-CA18: raw value clamped 1-20
-                attrs[k] = Math.max(1, Math.min(20, v < 0 ? 1 : v));
-              }
+              attrs[k] = Math.max(1, Math.min(20, v < 0 ? 1 : v));
             }
 
             // Staff mentals from staff.dat (1-20, no conversion needed)
