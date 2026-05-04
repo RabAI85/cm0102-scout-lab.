@@ -383,7 +383,16 @@ export class CM0102Parser {
             const attrs: Record<string, number> = {};
 
             for (const [k, v] of Object.entries(rp.namedAttrs) as [string, number][]) {
-              attrs[k] = Math.max(1, Math.min(20, v < 0 ? 1 : v));
+              const def = ATTR_DEFS[k];
+              if (def?.isCA18) {
+                // CM uses InMatch formula for technical attributes:
+                // v is the signed byte (negative = randomly seeded but formula still applies)
+                const inMatch = Math.round(v / 5.0 + rp.ca / 20.0 + 10);
+                attrs[k] = Math.max(1, Math.min(20, inMatch));
+              } else {
+                // Physical / hidden attributes: abs of raw signed byte
+                attrs[k] = Math.max(1, Math.min(20, Math.abs(v)));
+              }
             }
 
             // Staff mentals from staff.dat (1-20, no conversion needed)
