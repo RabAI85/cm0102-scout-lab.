@@ -385,10 +385,13 @@ export class CM0102Parser {
             for (const [k, v] of Object.entries(rp.namedAttrs) as [string, number][]) {
               const def = ATTR_DEFS[k];
               if (def?.isCA18) {
-                // CM uses InMatch formula for technical attributes:
-                // v is the signed byte (negative = randomly seeded but formula still applies)
-                const inMatch = Math.round(v / 5.0 + rp.ca / 20.0 + 10);
-                attrs[k] = Math.max(1, Math.min(20, inMatch));
+                // CM displays CA18 attributes using a quadratic conversion formula.
+                // GK-specific attributes use a CA-reduced variant for outfield players.
+                const isGKAttr = k === 'Reflexes' || k === 'Handling' || k === 'OneOnOnes';
+                const caWeight = (isGKAttr && !isGK) ? 200.0 : 20.0;
+                const d = v / 10.0 + rp.ca / caWeight + 10.0;
+                const r = (d * d) / 30.0 + d / 3.0 + 0.5;
+                attrs[k] = Math.max(1, Math.min(20, Math.trunc(r)));
               } else {
                 // Physical / hidden attributes: abs of raw signed byte
                 attrs[k] = Math.max(1, Math.min(20, Math.abs(v)));
