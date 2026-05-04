@@ -1,6 +1,6 @@
 {
   "name": "Scout Lab",
-  "description": "Scouting tool for uncompressed Championship Manager 01/02 save files.",
+  "description": "Premium scouting assistant for Championship Manager 01/02 save files, featuring verified attribute mapping and RLE decompression.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

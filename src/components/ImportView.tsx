@@ -62,32 +62,28 @@ export default function ImportView({
             <span className="h-[16px]"></span> {/* Alignment spacer */}
             <div className="bg-[#1C1B1B] p-8 rounded-2xl flex-1 flex flex-col items-center justify-center transition-all duration-300">
               {!isLoaded ? (
-                <div className="flex flex-col items-center justify-center space-y-4 w-full">
-                  <div className="opacity-40 flex flex-col items-center gap-2">
-                    <Database size={64} className="text-[#2A2A2A]" />
-                    <p className="font-sans text-sm text-[#888888] tracking-widest uppercase italic">
-                      {isParsing ? 'Parsing...' : 'Awaiting save file...'}
-                    </p>
-                  </div>
-
-                  {isParsing && (
-                    <div className="w-48 space-y-2">
-                      <div className="font-bebas text-lg text-scout-yellow tracking-widest">{Math.round(importProgress)}%</div>
-                      <div className="w-full bg-[#2A2A2A] h-1 rounded-full overflow-hidden">
-                        <div className="bg-scout-yellow h-full transition-all duration-300" style={{ width: `${importProgress}%` }} />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Log area — visible while parsing AND after failure */}
+                <div className="flex flex-col items-center justify-center space-y-4 opacity-40">
+                  <Database size={64} className="text-[#2A2A2A]" />
+                  <p className="font-sans text-sm text-[#888888] tracking-widest uppercase italic">Awaiting save file...</p>
+                  
                   {(isParsing || logs.length > 0) && (
-                    <div className="w-full bg-black/40 border border-[#1C1B1B] rounded-lg p-3 h-[160px] overflow-y-auto font-mono text-[9px] space-y-1 scrollbar-hide text-left">
-                      {logs.map((log: any, i: number) => (
-                        <div key={i} className={`flex gap-3 ${log.type === 'error' ? 'text-red-500' : log.type === 'success' ? 'text-scout-yellow' : 'text-[#666666]'}`}>
-                          <span className="shrink-0 opacity-50">[{log.timestamp}]</span>
-                          <span className="leading-relaxed">{log.message}</span>
-                        </div>
-                      ))}
+                    <div className="w-full space-y-4 mt-4 !opacity-100">
+                       <div className="w-48 mx-auto space-y-2">
+                         <div className="font-bebas text-lg text-scout-yellow tracking-widest">{Math.round(importProgress)}%</div>
+                         <div className="w-full bg-[#2A2A2A] h-1 rounded-full overflow-hidden">
+                            <div className="bg-scout-yellow h-full transition-all duration-300" style={{ width: `${importProgress}%` }} />
+                         </div>
+                       </div>
+
+                       {/* Log Area during parsing */}
+                       <div className="w-full bg-black/40 border border-[#1C1B1B] rounded-lg p-3 h-[120px] overflow-y-auto font-mono text-[9px] space-y-1 scrollbar-hide text-left">
+                        {logs.map((log: any, i: number) => (
+                          <div key={i} className={`flex gap-3 ${log.type === 'error' ? 'text-red-500' : log.type === 'success' ? 'text-scout-yellow' : 'text-[#666666]'}`}>
+                            <span className="shrink-0 opacity-50">[{log.timestamp}]</span>
+                            <span className="leading-relaxed">{log.message}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
