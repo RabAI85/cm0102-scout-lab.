@@ -243,38 +243,52 @@ export class CM0102Parser {
 
   // ── Block directory ───────────────────────────────────────────
 
-  // Try one candidate block-table format. Returns true if it produced at least
-  // one block name containing ".dat" with a position/size within the file.
+  // Try one candidate block-table format. Returns [score, blocks].
+  // Score is 0 if unusable; higher means more valid .dat blocks detected.
   private tryReadBlockTable(
     tableOffset: number,
     numBlocks: number,
-    nameFirst: boolean
-  ): boolean {
+    nameFirst: boolean,
+    nameLength: number
+  ): [number, Map<string, CMBlock>] {
     const fileSize = this.buffer.byteLength;
-    this.blocks.clear();
+    const testBlocks = new Map<string, CMBlock>();
     this.seek(tableOffset);
 
     for (let i = 0; i < numBlocks; i++) {
       let name: string, position: number, size: number;
       if (nameFirst) {
-        name     = this.readString(260);
+        name     = this.readString(nameLength);
         position = this.readInt32();
         size     = this.readInt32();
       } else {
         position = this.readInt32();
         size     = this.readInt32();
-        name     = this.readString(260);
+        name     = this.readString(nameLength);
       }
-      this.blocks.set(name.toLowerCase().trim(), { position, size });
+      testBlocks.set(name.toLowerCase().trim(), { position, size });
     }
 
-    return Array.from(this.blocks.entries()).some(([name, block]) =>
-      name.includes('.dat') &&
-      block.position > 0 &&
-      block.position < fileSize &&
-      block.size > 0 &&
-      block.size < fileSize
-    );
+    let score = 0;
+    for (const [name, block] of testBlocks.entries()) {
+      if (
+        name.includes('.dat') &&
+        block.position > 0 &&
+        block.position < fileSize &&
+        block.size > 0 &&
+        block.size < fileSize
+      ) {
+        score++;
+        // Extra weight for blocks we absolutely require
+        if (name.endsWith('player.dat') || name.endsWith('staff.dat') ||
+            name.endsWith('nation.dat') || name.endsWith('second_names.dat') ||
+            name.endsWith('common_names.dat')) {
+          score += 2;
+        }
+      }
+    }
+
+    return [score, testBlocks];
   }
 
   public parseHeader(): void {
@@ -286,38 +300,46 @@ export class CM0102Parser {
       );
     }
 
-    // Probe numBlocks at two candidate offsets (4 = no padding, 8 = 4-byte padding).
-    const candidates: Array<{ numBlocksOffset: number; nameFirst: boolean }> = [
-      { numBlocksOffset: 4, nameFirst: true  },  // name-first, no padding
-      { numBlocksOffset: 4, nameFirst: false },  // pos-first,  no padding
-      { numBlocksOffset: 8, nameFirst: true  },  // name-first, 4-byte padding
-      { numBlocksOffset: 8, nameFirst: false },  // pos-first,  4-byte padding
+    // Probe all combinations of: numBlocks offset, name-first vs pos-first, name length.
+    // CM 01/02 uses 256-byte or 260-byte padded name fields; try both.
+    const nameLengthCandidates = [256, 260, 128];
+    const layoutCandidates: Array<{ numBlocksOffset: number; nameFirst: boolean }> = [
+      { numBlocksOffset: 4, nameFirst: true  },
+      { numBlocksOffset: 4, nameFirst: false },
+      { numBlocksOffset: 8, nameFirst: true  },
+      { numBlocksOffset: 8, nameFirst: false },
     ];
 
-    let detected = false;
-    for (const { numBlocksOffset, nameFirst } of candidates) {
-      this.seek(numBlocksOffset);
-      const numBlocks = this.readInt32();
-      if (numBlocks < 1 || numBlocks > 200) continue;
+    let bestScore = 0;
+    let bestBlocks: Map<string, CMBlock> = new Map();
+    let bestDesc = '';
 
-      const tableOffset = numBlocksOffset + 4;
-      if (this.tryReadBlockTable(tableOffset, numBlocks, nameFirst)) {
-        this.log(
-          `Found ${numBlocks} blocks (format: numBlocks@${numBlocksOffset}, ${nameFirst ? 'name-first' : 'pos-first'}).`,
-          'info'
-        );
-        detected = true;
-        break;
+    for (const nameLength of nameLengthCandidates) {
+      for (const { numBlocksOffset, nameFirst } of layoutCandidates) {
+        this.seek(numBlocksOffset);
+        const numBlocks = this.readInt32();
+        if (numBlocks < 1 || numBlocks > 200) continue;
+
+        const tableOffset = numBlocksOffset + 4;
+        const [score, blocks] = this.tryReadBlockTable(tableOffset, numBlocks, nameFirst, nameLength);
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestBlocks = blocks;
+          bestDesc = `${numBlocks} blocks (numBlocks@${numBlocksOffset}, ${nameFirst ? 'name-first' : 'pos-first'}, nameLen=${nameLength})`;
+        }
       }
     }
 
-    if (!detected) {
+    if (bestScore === 0) {
       throw new Error(
         'Could not detect save file block table format. ' +
         'Make sure this is an uncompressed CM 01/02 save file (.sav).'
       );
     }
 
+    this.blocks = bestBlocks;
+    this.log(`Found ${bestDesc}, score=${bestScore}.`, 'info');
     this.log(`Block directory loaded. Blocks: ${Array.from(this.blocks.keys()).join(', ')}`, 'info');
   }
 
