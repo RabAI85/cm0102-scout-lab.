@@ -214,7 +214,7 @@ export default function ComparePlayers({
                <div className="absolute inset-0 border border-[#1C1B1B] rounded-full scale-90 pointer-events-none opacity-20"></div>
                <div className="absolute inset-0 border border-[#1C1B1B] rounded-full scale-75 pointer-events-none opacity-10"></div>
                
-               <ResponsiveContainer width="100%" height="100%">
+               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                   <PolarGrid stroke="#1C1B1B" />
                   <PolarAngleAxis dataKey="subject" tick={{ fill: '#888888', fontSize: 10, fontWeight: 900 }} />

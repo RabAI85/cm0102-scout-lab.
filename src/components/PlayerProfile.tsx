@@ -163,7 +163,7 @@ export default function PlayerProfile({
                   <div className="mt-4 bg-[#1C1B1B] rounded-xl p-3 flex flex-col items-center border border-[#2A2A2A]">
                     <span className="text-[#888888] text-[11px] font-bold tracking-[0.2em] mb-2 uppercase">SPREAD</span>
                     <div className="h-[180px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                         <RadarChart cx="50%" cy="50%" outerRadius="65" data={radarData}>
                           <PolarGrid stroke="#2A2A2A" />
                           <PolarAngleAxis dataKey="subject" tick={{ fill: '#888888', fontSize: 7, fontWeight: 700, letterSpacing: '0.1em' }} />
