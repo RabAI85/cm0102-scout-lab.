@@ -14,7 +14,9 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
-  Check
+  ChevronDown,
+  Check,
+  Binoculars
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CM0102Parser, Player } from './lib/CM0102Parser';
@@ -23,6 +25,7 @@ import ScoutLab from './components/ScoutLab';
 import PlayerProfile from './components/PlayerProfile';
 import ImportView from './components/ImportView';
 import ComparePlayers from './components/ComparePlayers';
+import RangeSlider from './components/RangeSlider';
 
 interface LogEntry {
   message: string;
@@ -143,6 +146,7 @@ export default function App() {
     );
   };
   
+  const [hasSearched, setHasSearched] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | null>('currentAbility');
@@ -150,25 +154,27 @@ export default function App() {
   const [importProgress, setImportProgress] = useState(0);
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
+  const [attributesExpanded, setAttributesExpanded] = useState(true);
   const [columnOrder, setColumnOrder] = useState<string[]>([
     'save', 'name', 'flag', 'pos', 'age', 'clubName', 'value', 'wage',
-    'currentAbility', 'potentialAbility', 'injuryProne', 'impMatches', 'consistency'
+    'currentAbility', 'potentialAbility', 'scoutRating', 'injuryProne', 'impMatches', 'consistency'
   ]);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     save: 40, name: 240, flag: 40, pos: 70, age: 55, clubName: 160,
-    value: 100, wage: 100, currentAbility: 55, potentialAbility: 55,
+    value: 100, wage: 100, currentAbility: 55, potentialAbility: 55, scoutRating: 55,
     injuryProne: 55, impMatches: 55, consistency: 55,
   });
   const [filters, setFilters] = useState({
     categories: [] as string[],
     sides: [] as string[],
-    minAge: 15, maxAge: 45,
-    minCA: 0, maxCA: 200,
-    minPA: 0, maxPA: 200,
+    ageRange: [15, 45] as [number, number],
+    caRange: [0, 200] as [number, number],
+    paRange: [0, 200] as [number, number],
+    scoutRatingRange: [0, 100] as [number, number],
     minValue: 0, maxValue: 50000000,
     minConsistency: 0, minImportantMatches: 0,
     minNaturalFitness: 0, maxInjuryProneness: 20,
-    attributes: {} as Record<string, number>,
+    attributeRanges: {} as Record<string, [number, number]>,
     enabledAttributes: [] as string[]
   });
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, colKey: string } | null>(null);
@@ -249,6 +255,9 @@ export default function App() {
       } else if (sortBy === 'name') {
         valA = `${a.firstName} ${a.lastName} ${a.commonName}`;
         valB = `${b.firstName} ${b.lastName} ${b.commonName}`;
+      } else if (sortBy === 'scoutRating') {
+        valA = Math.floor((a.currentAbility / 200) * 100);
+        valB = Math.floor((b.currentAbility / 200) * 100);
       } else {
         valA = (a as any)[sortBy];
         valB = (b as any)[sortBy];
@@ -286,13 +295,19 @@ export default function App() {
     });
     if (!matchesPosition) return false;
 
-    if (p.age > 0 && (p.age < filters.minAge || p.age > filters.maxAge)) return false;
-    if (p.currentAbility < filters.minCA || p.currentAbility > filters.maxCA) return false;
-    if (p.potentialAbility < filters.minPA || p.potentialAbility > filters.maxPA) return false;
+    if (p.age > 0 && (p.age < filters.ageRange[0] || p.age > filters.ageRange[1])) return false;
+    if (p.currentAbility < filters.caRange[0] || p.currentAbility > filters.caRange[1]) return false;
+    if (p.potentialAbility < filters.paRange[0] || p.potentialAbility > filters.paRange[1]) return false;
+    
+    const scoutRating = Math.floor((p.currentAbility / 200) * 100);
+    if (scoutRating < filters.scoutRatingRange[0] || scoutRating > filters.scoutRatingRange[1]) return false;
+
     if (p.value > 0 && (p.value < filters.minValue || p.value > filters.maxValue)) return false;
 
     for (const attr of filters.enabledAttributes) {
-      if ((p.attributes[attr] || 0) < (filters.attributes[attr] || 0)) return false;
+      const range = filters.attributeRanges[attr] || [1, 20];
+      const val = p.attributes[attr] || 0;
+      if (val < range[0] || val > range[1]) return false;
     }
 
     return true;
@@ -330,16 +345,18 @@ export default function App() {
   const clearFilters = () => {
     setFilters({
       categories: [], sides: [],
-      minAge: 15, maxAge: 45,
-      minCA: 0, maxCA: 200,
-      minPA: 0, maxPA: 200,
+      ageRange: [15, 45],
+      caRange: [0, 200],
+      paRange: [0, 200],
+      scoutRatingRange: [0, 100],
       minValue: 0, maxValue: 50000000,
       minConsistency: 0, minImportantMatches: 0,
       minNaturalFitness: 0, maxInjuryProneness: 20,
-      attributes: {},
+      attributeRanges: {},
       enabledAttributes: []
     });
     setSearchTerm('');
+    setHasSearched(false);
   };
 
   return (
@@ -373,37 +390,126 @@ export default function App() {
                   <ChevronLeft size={14} className="text-scout-yellow group-hover/toggle:text-black transition-colors" />
                 </button>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6 scrollbar-hide">
+                  {/* Position Filters */}
+                  <div className="flex gap-2">
+                    {['GK', 'DEF', 'MID', 'ATT'].map(cat => {
+                      const displayMap: any = { 'GK': 'GK', 'DEF': 'D', 'MID': 'M', 'ATT': 'A' };
+                      const label = displayMap[cat];
+                      const isActive = filters.categories.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          onClick={() => toggleCategory(cat)}
+                          className={`flex-1 aspect-square rounded-lg flex items-center justify-center font-black text-[12px] transition-all border ${isActive ? 'bg-scout-yellow text-black border-scout-yellow' : 'bg-transparent text-white border-[#2A2A2A] hover:border-white/20'}`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Numerical Input Filters */}
                   <div className="space-y-4">
-                    {[...ALL_ATTRIBUTES].sort().map(attr => (
-                      <div key={attr} className="space-y-2">
-                        <div className="flex justify-between items-center px-1">
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={() => toggleAttributeEnabled(attr)}
-                              className={`w-3.5 h-3.5 rounded-sm border transition-colors flex items-center justify-center ${filters.enabledAttributes.includes(attr) ? 'bg-scout-yellow border-scout-yellow' : 'bg-[#1C1B1B] border-[#2A2A2A]'}`}
-                            >
-                              {filters.enabledAttributes.includes(attr) && <Check size={10} className="text-black stroke-[4px]" />}
-                            </button>
-                            <label className="text-[10px] font-black text-[#888888] tracking-[0.1em] uppercase">{attr}</label>
+                    {[
+                      { label: 'AGE', key: 'ageRange', max: 99 },
+                      { label: 'CA', key: 'caRange', max: 200 },
+                      { label: 'PA', key: 'paRange', max: 200 },
+                      { label: 'SCOUT RATING', key: 'scoutRatingRange', max: 100 },
+                    ].map((item) => (
+                      <div key={item.key} className="space-y-2">
+                        <label className="text-[10px] font-black text-white tracking-[0.1em] uppercase">{item.label}</label>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 flex items-center bg-[#1C1B1B] rounded border border-[#2A2A2A] px-2 py-1">
+                            <span className="text-[9px] text-[#444] font-bold mr-2">MIN</span>
+                            <input 
+                              type="number"
+                              min="0"
+                              max={item.max}
+                              value={(filters as any)[item.key][0]}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setFilters(f => ({ ...f, [item.key]: [val, (f as any)[item.key][1]] }));
+                              }}
+                              className="bg-transparent border-none text-[11px] font-sans text-white focus:ring-0 w-full outline-none"
+                            />
                           </div>
-                          <span className={`font-sans text-[10px] font-bold ${filters.enabledAttributes.includes(attr) ? 'text-scout-yellow' : 'text-[#444444]'}`}>
-                            {filters.attributes[attr] || 0}
-                          </span>
+                          <div className="flex-1 flex items-center bg-[#1C1B1B] rounded border border-[#2A2A2A] px-2 py-1">
+                            <span className="text-[9px] text-[#444] font-bold mr-2">MAX</span>
+                            <input 
+                              type="number"
+                              min="0"
+                              max={item.max}
+                              value={(filters as any)[item.key][1]}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setFilters(f => ({ ...f, [item.key]: [(f as any)[item.key][0], val] }));
+                              }}
+                              className="bg-transparent border-none text-[11px] font-sans text-white focus:ring-0 w-full outline-none"
+                            />
+                          </div>
                         </div>
-                        <input 
-                          type="range" min="0" max="20"
-                          disabled={!filters.enabledAttributes.includes(attr)}
-                          value={filters.attributes[attr] || 0}
-                          onChange={(e) => setFilters(f => ({
-                            ...f,
-                            attributes: { ...f.attributes, [attr]: parseInt(e.target.value) }
-                          }))}
-                          className={`w-full accent-scout-yellow ${!filters.enabledAttributes.includes(attr) ? 'opacity-20 cursor-not-allowed' : ''}`}
-                        />
                       </div>
                     ))}
                   </div>
+
+                  {/* Player Attributes Collapsible */}
+                  <div className="space-y-4">
+                    <button 
+                      onClick={() => setAttributesExpanded(!attributesExpanded)}
+                      className="w-full flex items-center justify-between group py-2 border-t border-[#1C1B1B]"
+                    >
+                      <label className="text-[10px] font-black text-white tracking-[0.1em] uppercase cursor-pointer">PLAYER ATTRIBUTES</label>
+                      <ChevronDown size={14} className={`text-[#888888] group-hover:text-white transition-transform ${attributesExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {attributesExpanded && (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                        {[...ALL_ATTRIBUTES].sort().map(attr => (
+                          <div key={attr} className="space-y-2">
+                            <div className="flex justify-between items-center px-1">
+                              <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={() => toggleAttributeEnabled(attr)}
+                                  className={`w-3.5 h-3.5 rounded-sm border transition-colors flex items-center justify-center ${filters.enabledAttributes.includes(attr) ? 'bg-scout-yellow border-scout-yellow' : 'bg-[#1C1B1B] border-[#2A2A2A]'}`}
+                                >
+                                  {filters.enabledAttributes.includes(attr) && <Check size={10} className="text-black stroke-[4px]" />}
+                                </button>
+                                <label className="text-[10px] font-black text-[#888888] tracking-[0.1em] uppercase">{attr}</label>
+                              </div>
+                              <span className={`font-sans text-[10px] font-bold ${filters.enabledAttributes.includes(attr) ? 'text-scout-yellow' : 'text-[#444444]'}`}>
+                                {filters.attributeRanges[attr] ? `${filters.attributeRanges[attr][0]} - ${filters.attributeRanges[attr][1]}` : '1 - 20'}
+                              </span>
+                            </div>
+                            <RangeSlider
+                              min={1}
+                              max={20}
+                              disabled={!filters.enabledAttributes.includes(attr)}
+                              value={filters.attributeRanges[attr] || [1, 20]}
+                              onChange={(val) => setFilters(f => ({
+                                ...f,
+                                attributeRanges: { ...f.attributeRanges, [attr]: val }
+                              }))}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Find Players Button */}
+                <div className="p-6 border-t border-[#1C1B1B]">
+                  <button 
+                    onClick={() => {
+                      setHasSearched(true);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full bg-scout-yellow text-black font-black py-4 rounded-xl flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(205,255,0,0.15)] uppercase tracking-[0.15em] text-[13px]"
+                  >
+                    <Binoculars size={20} />
+                    FIND PLAYERS
+                  </button>
                 </div>
               </div>
             </aside>
@@ -432,6 +538,7 @@ export default function App() {
               ALL_ATTRIBUTES={ALL_ATTRIBUTES}
               shortlist={shortlist}
               toggleShortlist={toggleShortlist}
+              hasSearched={hasSearched}
             />
           </MainLayout>
         } />

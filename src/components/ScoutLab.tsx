@@ -38,6 +38,7 @@ interface ScoutLabProps {
   title?: string;
   shortlist: number[];
   toggleShortlist: (id: number) => void;
+  hasSearched?: boolean;
 }
 
 export default function ScoutLab({
@@ -63,7 +64,8 @@ export default function ScoutLab({
   ALL_ATTRIBUTES,
   title = "GLOBAL PLAYER DATABASE",
   shortlist,
-  toggleShortlist
+  toggleShortlist,
+  hasSearched = true
 }: ScoutLabProps) {
   const navigate = useNavigate();
 
@@ -80,7 +82,7 @@ export default function ScoutLab({
     <main className="flex-1 flex flex-col bg-[#0E0E0E] overflow-hidden relative">
       {/* Search Header */}
       <header className="h-[48px] px-6 flex items-center justify-between border-b border-[#1C1B1B] shrink-0 bg-[#0E0E0E] z-20">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-8">
           {isFilterCollapsed && (
             <button 
               onClick={() => setIsFilterCollapsed(false)}
@@ -90,11 +92,35 @@ export default function ScoutLab({
             </button>
           )}
           <div className="flex items-baseline gap-3">
-            <h2 className="font-bebas text-[14px] text-scout-yellow tracking-widest leading-none translate-y-[1px]">{title}</h2>
-            <div className="font-sans text-[8px] tracking-[0.2em] font-bold text-white/40 uppercase whitespace-nowrap">
-              {sortedPlayers.length.toLocaleString()} {title.includes('SHORTLIST') ? 'SAVED' : 'PLAYERS LOADED'}
+            <h2 className="font-bebas text-[16px] text-scout-yellow tracking-widest leading-none translate-y-[1px]">{title}</h2>
+            <div className="font-sans text-[10px] tracking-[0.2em] font-bold text-white uppercase whitespace-nowrap">
+              {hasSearched ? sortedPlayers.length.toLocaleString() : '0'} {title.includes('SHORTLIST') ? 'SAVED' : 'PLAYERS LOADED'}
             </div>
           </div>
+
+          {hasSearched && (
+            <div className="flex items-center gap-4 border-l border-[#1C1B1B] pl-8 h-4">
+              <div className="flex gap-1">
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1 text-white hover:text-scout-yellow disabled:opacity-20 transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-1 text-white hover:text-scout-yellow disabled:opacity-20 transition-colors"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+              <div className="text-[10px] font-sans font-bold text-white uppercase tracking-widest whitespace-nowrap">
+                SHOWING {(sortedPlayers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0)} — {Math.min(currentPage * itemsPerPage, sortedPlayers.length)} OF {sortedPlayers.length}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -118,10 +144,16 @@ export default function ScoutLab({
 
       {/* Database Table */}
       <div className="flex-1 overflow-hidden px-4 pb-4 mt-2 flex flex-col">
-        <div className="flex-1 bg-[#1C1B1B] rounded-2xl overflow-hidden flex flex-col shadow-2xl">
-          <div className="flex-1 overflow-auto scrollbar-hide">
-            <table className="w-full text-left border-collapse table-fixed">
-              <thead className="sticky top-0 z-10 w-full bg-[#1C1B1B]">
+        {!hasSearched ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-[#444] bg-[#1C1B1B] rounded-2xl border border-[#2A2A2A] border-dashed">
+            <Search size={48} className="mb-4 opacity-10" />
+            <p className="text-[14px] font-black tracking-widest uppercase opacity-40">Select filters and click the search icon to load players.</p>
+          </div>
+        ) : (
+          <div className="flex-1 bg-[#1C1B1B] rounded-2xl overflow-hidden flex flex-col shadow-2xl">
+            <div className="flex-1 overflow-auto scrollbar-hide">
+              <table className="w-full text-left border-collapse table-fixed">
+                <thead className="sticky top-0 z-10 w-full bg-[#1C1B1B]">
                 <tr className="bg-[#1C1B1B]/90 backdrop-blur-md text-white text-[13px] uppercase tracking-[0.1em] font-black w-full flex">
                   {columnOrder.map((colKey) => {
                     const columns: any = {
@@ -135,6 +167,7 @@ export default function ScoutLab({
                       wage:             { label: 'WAGES',   textAlign: 'right',  sortKey: 'wage' },
                       currentAbility:   { label: 'CA',      textAlign: 'center', sortKey: 'currentAbility' },
                       potentialAbility: { label: 'PA',      textAlign: 'center', sortKey: 'potentialAbility' },
+                      scoutRating:      { label: 'SR',      textAlign: 'center', sortKey: 'scoutRating' },
                       injuryProne:      { label: 'INJ',     textAlign: 'center', sortKey: 'injuryProne' },
                       impMatches:       { label: 'IMP',     textAlign: 'center', sortKey: 'impMatches' },
                       consistency:      { label: 'CNS',     textAlign: 'center', sortKey: 'consistency' },
@@ -334,6 +367,13 @@ export default function ScoutLab({
                                 {player.potentialAbility}
                               </td>
                             );
+                          case 'scoutRating':
+                            const sr = Math.floor((player.currentAbility / 200) * 100);
+                            return (
+                              <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-outfit font-black text-scout-yellow flex items-center justify-center">
+                                {sr}
+                              </td>
+                            );
                           case 'injuryProne':
                             return <td key={colKey} style={{ width, flexShrink: 0 }} className="p-[6px] text-center font-outfit font-bold text-white/70 flex items-center justify-center">{injuryProne}</td>;
                           case 'impMatches':
@@ -355,32 +395,9 @@ export default function ScoutLab({
               </tbody>
             </table>
           </div>
-          
-          <div className="p-4 bg-[#1C1B1B] border-t border-[#2A2A2A]/50 flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-1 text-white hover:text-[#E8F000] disabled:opacity-30 transition-colors"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <button 
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-1 text-white hover:text-[#E8F000] disabled:opacity-30 transition-colors"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-              <div className="text-[10px] font-sans font-bold text-[#888888] uppercase tracking-widest flex items-center h-4">
-                SHOWING <span className="text-white mx-2">{(sortedPlayers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0)} — {Math.min(currentPage * itemsPerPage, sortedPlayers.length)}</span> OF {sortedPlayers.length}
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
-    </main>
+      )}
+    </div>
+  </main>
   );
 }
